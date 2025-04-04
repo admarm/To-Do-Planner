@@ -1,18 +1,31 @@
 import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
-function Login() {
+function Login({ setIsLoggedIn, setUserId }) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [message, setMessage] = useState('');
+    const navigate = useNavigate();
 
     function handleSubmit(event) {
         event.preventDefault();
         axios.post('http://localhost:5000/login', { email, password })
-            .then(res => setMessage(res.data))
-            .catch(err => setMessage('Request failed'));
+        .then(res => {
+            console.log("Login response:", res.data); // Debug the response
+            if (res.data.message) {
+                setMessage(res.data.message);
+                if (res.data.message === "Login Successful") {
+                    setIsLoggedIn(true);
+                    setUserId(res.data.userId);
+                    setTimeout(() => navigate('/board'), 1000);
+                }
+            } else {
+                setMessage(res.data);
+            }
+        })
+        .catch(err => setMessage('Request failed'));
     }
 
     return (
