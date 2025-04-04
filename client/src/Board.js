@@ -1,38 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
+import { Dropdown } from 'react-bootstrap'; // Import React Bootstrap Dropdown
 
 function Board({ userId }) {
     const [cards, setCards] = useState([]);
     const [newCardTitle, setNewCardTitle] = useState('');
     const [showInput, setShowInput] = useState({});
-    const [lists, setLists] = useState([]);
+    const [lists, setLists] = useState(['Tasks', 'In Progress', 'Done']);
     const [newListName, setNewListName] = useState('');
     const [showListInput, setShowListInput] = useState(false);
     const [renamingList, setRenamingList] = useState(null);
     const [renameValue, setRenameValue] = useState('');
 
-    // Fetch lists and cards when the component mounts
+    // Fetch cards when the component mounts
     useEffect(() => {
         if (userId) {
-            // Fetch lists
-            axios.get(`http://localhost:5000/lists/${userId}`)
-                .then(res => {
-                    if (Array.isArray(res.data)) {
-                        setLists(res.data);
-                    } else {
-                        console.error('Unexpected lists response format:', res.data);
-                    }
-                })
-                .catch(err => console.error('Error fetching lists:', err));
-
-            // Fetch cards
+            console.log("Fetching cards for userId:", userId);
             axios.get(`http://localhost:5000/cards/${userId}`)
                 .then(res => {
                     if (Array.isArray(res.data)) {
                         setCards(res.data);
                     } else {
-                        console.error('Unexpected cards response format:', res.data);
+                        console.error('Unexpected response format:', res.data);
                     }
                 })
                 .catch(err => console.error('Error fetching cards:', err));
@@ -93,26 +83,14 @@ function Board({ userId }) {
             alert('List name already exists');
             return;
         }
-        axios.post('http://localhost:5000/lists', { userId, name: newListName.trim() })
-            .then(res => {
-                if (res.data === "List Added") {
-                    setLists([...lists, newListName.trim()]);
-                    setNewListName('');
-                    setShowListInput(false);
-                } else {
-                    alert('Failed to add list');
-                }
-            })
-            .catch(err => {
-                console.error('Error adding list:', err);
-                alert('Error adding list');
-            });
+        setLists([...lists, newListName.trim()]);
+        setNewListName('');
+        setShowListInput(false);
     };
 
     // Handle deleting a list
     const handleDeleteList = (listName) => {
         if (window.confirm(`Are you sure you want to delete the list "${listName}"? All cards in this list will be moved to "Tasks".`)) {
-            // Move cards to "Tasks"
             const updatedCards = cards.map(card => {
                 if ((card.column_name || '').trim() === listName) {
                     return { ...card, column_name: 'Tasks' };
@@ -120,25 +98,12 @@ function Board({ userId }) {
                 return card;
             });
             setCards(updatedCards);
-            // Update the database (move cards)
             axios.put('http://localhost:5000/cards/move', { userId, fromList: listName, toList: 'Tasks' })
                 .then(res => {
                     console.log("Cards moved:", res.data);
                 })
                 .catch(err => console.error("Error moving cards:", err));
-            // Delete the list from the database
-            axios.delete('http://localhost:5000/lists', { data: { userId, name: listName } })
-                .then(res => {
-                    if (res.data === "List Deleted") {
-                        setLists(lists.filter(list => list !== listName));
-                    } else {
-                        alert('Failed to delete list');
-                    }
-                })
-                .catch(err => {
-                    console.error('Error deleting list:', err);
-                    alert('Error deleting list');
-                });
+            setLists(lists.filter(list => list !== listName));
         }
     };
 
@@ -152,38 +117,22 @@ function Board({ userId }) {
             alert('List name already exists');
             return;
         }
-        // Update the list name in the database
-        axios.put('http://localhost:5000/lists', { userId, oldName, newName: renameValue.trim() })
+        const updatedLists = lists.map(list => (list === oldName ? renameValue.trim() : list));
+        setLists(updatedLists);
+        const updatedCards = cards.map(card => {
+            if ((card.column_name || '').trim() === oldName) {
+                return { ...card, column_name: renameValue.trim() };
+            }
+            return card;
+        });
+        setCards(updatedCards);
+        axios.put('http://localhost:5000/cards/rename', { userId, oldName, newName: renameValue.trim() })
             .then(res => {
-                if (res.data === "List Renamed") {
-                    // Update the list name in the frontend
-                    const updatedLists = lists.map(list => (list === oldName ? renameValue.trim() : list));
-                    setLists(updatedLists);
-                    // Update the column_name of all cards in this list
-                    const updatedCards = cards.map(card => {
-                        if ((card.column_name || '').trim() === oldName) {
-                            return { ...card, column_name: renameValue.trim() };
-                        }
-                        return card;
-                    });
-                    setCards(updatedCards);
-                    // Update the database (rename cards)
-                    axios.put('http://localhost:5000/cards/rename', { userId, oldName, newName: renameValue.trim() })
-                        .then(res => {
-                            console.log("Cards renamed:", res.data);
-                        })
-                        .catch(err => console.error("Error renaming cards:", err));
-                    // Reset renaming state
-                    setRenamingList(null);
-                    setRenameValue('');
-                } else {
-                    alert('Failed to rename list');
-                }
+                console.log("Cards renamed:", res.data);
             })
-            .catch(err => {
-                console.error('Error renaming list:', err);
-                alert('Error renaming list');
-            });
+            .catch(err => console.error("Error renaming cards:", err));
+        setRenamingList(null);
+        setRenameValue('');
     };
 
     return (
@@ -231,39 +180,32 @@ function Board({ userId }) {
                             <div className='card mb-3' style={{ backgroundColor: '#2c3e50', border: 'none' }}>
                                 <div className='card-header text-white d-flex justify-content-between align-items-center'>
                                     <h5 className='mb-0'>{column}</h5>
-                                    <div className='dropdown'>
-                                        <button
-                                            className='btn btn-link text-white'
-                                            type='button'
-                                            id={`dropdownMenuButton-${column}`}
-                                            data-bs-toggle='dropdown'
-                                            aria-expanded='false'
+                                    <Dropdown>
+                                        <Dropdown.Toggle
+                                            variant="link"
+                                            id={`dropdown-${column}`}
+                                            className="text-white p-0"
                                             style={{ textDecoration: 'none' }}
                                         >
                                             ...
-                                        </button>
-                                        <ul className='dropdown-menu dropdown-menu-end' aria-labelledby={`dropdownMenuButton-${column}`}>
-                                            <li>
-                                                <button
-                                                    className='dropdown-item'
-                                                    onClick={() => {
-                                                        setRenamingList(column);
-                                                        setRenameValue(column);
-                                                    }}
-                                                >
-                                                    Rename
-                                                </button>
-                                            </li>
-                                            <li>
-                                                <button
-                                                    className='dropdown-item text-danger'
-                                                    onClick={() => handleDeleteList(column)}
-                                                >
-                                                    Delete
-                                                </button>
-                                            </li>
-                                        </ul>
-                                    </div>
+                                        </Dropdown.Toggle>
+                                        <Dropdown.Menu align="end">
+                                            <Dropdown.Item
+                                                onClick={() => {
+                                                    setRenamingList(column);
+                                                    setRenameValue(column);
+                                                }}
+                                            >
+                                                Rename
+                                            </Dropdown.Item>
+                                            <Dropdown.Item
+                                                onClick={() => handleDeleteList(column)}
+                                                className="text-danger"
+                                            >
+                                                Delete
+                                            </Dropdown.Item>
+                                        </Dropdown.Menu>
+                                    </Dropdown>
                                 </div>
                                 <div className='card-body p-2'>
                                     {renamingList === column ? (
