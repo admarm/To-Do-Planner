@@ -1,12 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import Login from "./Login";
 import Signup from "./Signup";
 import Board from "./Board";
 
 function App() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [userId, setUserId] = useState(null);
+    const [isLoggedIn, setIsLoggedIn] = useState(() => {
+        return localStorage.getItem('isLoggedIn') === 'true';
+    });
+    const [userId, setUserId] = useState(() => {
+        return localStorage.getItem('userId') || null;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('isLoggedIn', isLoggedIn);
+        localStorage.setItem('userId', userId);
+    }, [isLoggedIn, userId]);
+
+    const handleLogout = () => {
+        setIsLoggedIn(false);
+        setUserId(null);
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('userId');
+    };
 
     return (
         <Router>
@@ -25,10 +41,7 @@ function App() {
                                     <Link className="nav-link" to="/board">Board</Link>
                                     <button
                                         className="nav-link btn btn-link"
-                                        onClick={() => {
-                                            setIsLoggedIn(false);
-                                            setUserId(null);
-                                        }}
+                                        onClick={handleLogout}
                                     >
                                         Logout
                                     </button>
@@ -47,7 +60,7 @@ function App() {
                     <Route
                         path="/board"
                         element={
-                            isLoggedIn ? (
+                            isLoggedIn && userId ? (
                                 <>
                                     {console.log("userId in App.js:", userId)}
                                     <Board userId={userId} />
