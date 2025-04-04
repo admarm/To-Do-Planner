@@ -21,7 +21,7 @@ db.connect((err) => {
     console.log("Connected to MySQL database");
 });
 
-// Login endpoint (return user ID on success)
+// Login endpoint
 app.post('/login', (req, res) => {
     const sql = "SELECT * FROM users WHERE email = ? AND password = ?";
     db.query(sql, [req.body.email, req.body.password], (err, data) => {
@@ -29,7 +29,6 @@ app.post('/login', (req, res) => {
             console.error("Query error:", err);
             return res.json("Error");
         }
-        console.log("Login query result:", data); // Debug the query result
         if (data.length > 0) {
             return res.json({ message: "Login Successful", userId: data[0].idusers });
         } else {
@@ -77,7 +76,6 @@ app.get('/cards/:userId', (req, res) => {
 // Add a new card
 app.post('/cards', (req, res) => {
     const { userId, title, color = 'orange', column_name = 'Tasks' } = req.body;
-    // Normalize column_name to match frontend values
     const normalizedColumnName = column_name.trim();
     console.log("Inserting card with data:", { userId, title, color, column_name: normalizedColumnName });
     const sql = "INSERT INTO cards (user_id, title, color, column_name) VALUES (?, ?, ?, ?)";
@@ -88,6 +86,84 @@ app.post('/cards', (req, res) => {
         }
         console.log("Card inserted, ID:", data.insertId);
         return res.json({ message: "Card Added", cardId: data.insertId, color, column_name: normalizedColumnName });
+    });
+});
+
+// Move cards to another list
+app.put('/cards/move', (req, res) => {
+    const { userId, fromList, toList } = req.body;
+    const sql = "UPDATE cards SET column_name = ? WHERE user_id = ? AND column_name = ?";
+    db.query(sql, [toList, userId, fromList], (err, data) => {
+        if (err) {
+            console.error("Error moving cards:", err);
+            return res.json("Error");
+        }
+        return res.json("Cards Moved");
+    });
+});
+
+// Rename a list (update column_name for all cards in that list)
+app.put('/cards/rename', (req, res) => {
+    const { userId, oldName, newName } = req.body;
+    const sql = "UPDATE cards SET column_name = ? WHERE user_id = ? AND column_name = ?";
+    db.query(sql, [newName, userId, oldName], (err, data) => {
+        if (err) {
+            console.error("Error renaming cards:", err);
+            return res.json("Error");
+        }
+        return res.json("Cards Renamed");
+    });
+});
+
+// Fetch lists for a user
+app.get('/lists/:userId', (req, res) => {
+    const userId = req.params.userId;
+    const sql = "SELECT name FROM lists WHERE user_id = ?";
+    db.query(sql, [userId], (err, data) => {
+        if (err) {
+            console.error("Error fetching lists:", err);
+            return res.json("Error");
+        }
+        return res.json(data.map(row => row.name));
+    });
+});
+
+// Add a new list
+app.post('/lists', (req, res) => {
+    const { userId, name } = req.body;
+    const sql = "INSERT INTO lists (user_id, name) VALUES (?, ?)";
+    db.query(sql, [userId, name], (err, data) => {
+        if (err) {
+            console.error("Error adding list:", err);
+            return res.json("Error");
+        }
+        return res.json("List Added");
+    });
+});
+
+// Delete a list
+app.delete('/lists', (req, res) => {
+    const { userId, name } = req.body;
+    const sql = "DELETE FROM lists WHERE user_id = ? AND name = ?";
+    db.query(sql, [userId, name], (err, data) => {
+        if (err) {
+            console.error("Error deleting list:", err);
+            return res.json("Error");
+        }
+        return res.json("List Deleted");
+    });
+});
+
+// Rename a list
+app.put('/lists', (req, res) => {
+    const { userId, oldName, newName } = req.body;
+    const sql = "UPDATE lists SET name = ? WHERE user_id = ? AND name = ?";
+    db.query(sql, [newName, userId, oldName], (err, data) => {
+        if (err) {
+            console.error("Error renaming list:", err);
+            return res.json("Error");
+        }
+        return res.json("List Renamed");
     });
 });
 
