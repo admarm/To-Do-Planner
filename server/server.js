@@ -1,5 +1,5 @@
 const express = require('express');
-const mysql = require('mysql');
+const mysql = require('mysql2');
 const cors = require('cors');
 
 const app = express();
@@ -31,8 +31,7 @@ app.post('/login', (req, res) => {
         if(data.length > 0) {
             return res.json("Login Successful")
         }else {
-            console.error("Login error: ", err);
-            return res.json("Login Failed")
+            return res.json("Login Failed")           
         }
     })
 });
@@ -65,5 +64,5 @@ app.post('/signup', (req, res) => {
 
 port = 5000;
 app.listen(port, () => 
-    {console.log(`Server started and listening on port ${port}`)
+    {console.log(`Server started and listening on port ${port} ...`)
 });

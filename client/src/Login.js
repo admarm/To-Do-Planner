@@ -16,6 +16,7 @@ function Login(){
   return (
     <div className='d-flex vh-100 justify-content-center align-items-center bg-primary'>
       <div className='p-3 bg-white w-25'>
+        <h2>Login</h2>
         <form onSubmit={handleSubmit}>
           <div className='mb-3'>
             <label htmlFor='email'>Email</label>
@@ -23,7 +24,7 @@ function Login(){
           </div>
           <div className='mb-3'>
             <label htmlFor='password'>Password</label>
-            <input type='password' placeholder='Enter Password' onChange={e => setPassword(e.target.value)}/>
+            <input type='password' placeholder='Enter Password' className='form-control' onChange={e => setPassword(e.target.value)}/>
           </div>
           <button className='btn btn-success'>Login</button>
         </form>
