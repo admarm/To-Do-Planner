@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
-import { Dropdown } from 'react-bootstrap';
-import { DndContext, closestCenter, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { SketchPicker } from 'react-color';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchCards, addCard, updateCard, deleteCard, setCards } from './store';
@@ -12,7 +8,7 @@ import { fetchCards, addCard, updateCard, deleteCard, setCards } from './store';
 function Board({ userId }) {
     console.log("Board component rendered with userId:", userId);
     const dispatch = useDispatch();
-    const { cards, isLoading, error } = useSelector((state) => state.cards);
+    const { cards = [], isLoading, error } = useSelector((state) => state.cards);
 
     const [newCardTitle, setNewCardTitle] = useState('');
     const [showInput, setShowInput] = useState({});
@@ -26,14 +22,11 @@ function Board({ userId }) {
     const [editCardTitle, setEditCardTitle] = useState('');
     const [showColorPicker, setShowColorPicker] = useState(null);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor),
-        useSensor(sortableKeyboardCoordinates)
-    );
-
     // Fetch cards when userId changes
     useEffect(() => {
         if (userId) {
+            // Reset the cards in the Redux store before fetching
+            dispatch(setCards([]));
             dispatch(fetchCards(userId));
         }
     }, [userId, dispatch]);
@@ -67,11 +60,13 @@ function Board({ userId }) {
                 } else {
                     console.error('Unexpected response:', res.data);
                     alert('Failed to add card');
+                    dispatch(fetchCards(userId));
                 }
             })
             .catch(err => {
                 console.error('Error adding card:', err);
                 alert('Error adding card');
+                dispatch(fetchCards(userId));
             });
     };
 
@@ -163,12 +158,27 @@ function Board({ userId }) {
 
     const handleDeleteCard = (cardId) => {
         if (window.confirm('Are you sure you want to delete this card?')) {
-            dispatch(deleteCard(cardId));
             axios.delete(`http://localhost:5000/cards/${cardId}`)
                 .then(res => {
-                    console.log("Card deleted:", res.data);
+                    console.log("Delete card response:", res.data);
+                    if (res.data === "Card Deleted") {
+                        dispatch(deleteCard(cardId));
+                    } else {
+                        console.error("Unexpected response:", res.data);
+                        alert('Failed to delete card');
+                        dispatch(fetchCards(userId));
+                    }
                 })
-                .catch(err => console.error("Error deleting card:", err));
+                .catch(err => {
+                    console.error("Error deleting card:", err);
+                    if (err.response && err.response.status === 404) {
+                        alert('Card not found. It may have already been deleted.');
+                        dispatch(deleteCard(cardId));
+                    } else {
+                        alert('Error deleting card');
+                        dispatch(fetchCards(userId));
+                    }
+                });
         }
     };
 
@@ -205,7 +215,7 @@ function Board({ userId }) {
     };
 
     const handleMoveList = (listName) => {
-        alert(`Move list "${listName}" functionality to be implemented. You can already drag lists to reorder them.`);
+        alert(`Move list "${listName}" functionality to be implemented.`);
     };
 
     const handleMoveAllCards = (listName) => {
@@ -245,122 +255,195 @@ function Board({ userId }) {
         setShowColorPicker(null);
     };
 
-    const handleDragEnd = (event) => {
-        const { active, over } = event;
+    const SimpleList = ({ column }) => {
+        const inputRef = React.useRef(null);
+        const addCardInputRef = React.useRef(null);
+        const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-        if (!over) return;
-
-        // Handle list dragging
-        if (lists.includes(active.id) && lists.includes(over.id)) {
-            const oldIndex = lists.indexOf(active.id);
-            const newIndex = lists.indexOf(over.id);
-            if (oldIndex !== newIndex) {
-                setLists(arrayMove(lists, oldIndex, newIndex));
+        React.useEffect(() => {
+            if (renamingList === column && inputRef.current) {
+                inputRef.current.focus();
             }
-            return;
-        }
+        }, [column]);
 
-        // Handle card dragging
-        const card = cards.find(c => c.id === parseInt(active.id));
-        if (!card) return;
+        React.useEffect(() => {
+            if (showInput[column] && addCardInputRef.current) {
+                addCardInputRef.current.focus();
+            }
+        }, [column]);
 
-        const sourceList = card.column_name;
-        const destinationList = over.id;
-
-        if (sourceList !== destinationList) {
-            const updatedCards = cards.map(c => {
-                if (c.id === card.id) {
-                    return { ...c, column_name: destinationList };
+        // Close dropdown when clicking outside
+        React.useEffect(() => {
+            const handleClickOutside = (event) => {
+                if (isDropdownOpen && !event.target.closest(`#dropdown-${column}`) && !event.target.closest('.custom-dropdown-menu')) {
+                    setIsDropdownOpen(false);
                 }
-                return c;
-            });
-            dispatch(setCards(updatedCards));
-            axios.put(`http://localhost:5000/cards/${card.id}/move`, { column_name: destinationList })
-                .then(res => {
-                    console.log("Card moved:", res.data);
-                })
-                .catch(err => console.error("Error moving card:", err));
-        }
-    };
+            };
+            document.addEventListener('mousedown', handleClickOutside);
+            return () => {
+                document.removeEventListener('mousedown', handleClickOutside);
+            };
+        }, [isDropdownOpen, column]);
 
-    const SortableList = ({ column }) => {
-        const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: column });
-
-        const style = {
-            transform: CSS.Transform.toString(transform),
-            transition,
-            width: '300px',
-        };
-
-        console.log('Cards state before rendering SortableContext:', cards);
-        const filteredCards = cards.filter(card => (card.column_name || '').trim() === column);
+        console.log('Cards state before rendering list:', cards);
+        const filteredCards = (cards || []).filter(card => (card.column_name || '').trim() === column);
         console.log(`Filtered cards for column ${column}:`, filteredCards);
 
         return (
-            <div
-                ref={setNodeRef}
-                style={style}
-                {...attributes}
-                {...listeners}
-                className='flex-shrink-0'
-            >
-                <div className='card mb-3' style={{ backgroundColor: listColors[column] || '#2c3e50', border: 'none' }}>
-                    <div className='card-header text-white d-flex justify-content-between align-items-center'>
-                        <h5 className='mb-0'>{column}</h5>
-                        <Dropdown>
-                            <Dropdown.Toggle
-                                variant="link"
+            <div className='flex-shrink-0' style={{ width: '300px' }}>
+                <div className='card mb-3' style={{ backgroundColor: listColors[column] || '#2c3e50', border: 'none', overflow: 'visible' }}>
+                    <div className='card-header text-white d-flex justify-content-between align-items-center' style={{ width: '100%' }}>
+                        <h5
+                            className='mb-0'
+                            style={{
+                                maxWidth: '200px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                            }}
+                            title={column}
+                        >
+                            {column}
+                        </h5>
+                        <div style={{ width: '30px', textAlign: 'center', position: 'relative' }}>
+                            <button
                                 id={`dropdown-${column}`}
                                 className="text-white p-0"
-                                style={{ textDecoration: 'none' }}
+                                style={{ background: 'none', border: 'none', textDecoration: 'none', width: '30px', textAlign: 'center' }}
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             >
                                 ...
-                            </Dropdown.Toggle>
-                            <Dropdown.Menu align="end">
-                                <Dropdown.Item onClick={() => setShowInput({ ...showInput, [column]: true })}>
-                                    Add card
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleCopyList(column)}>
-                                    Copy list
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleMoveList(column)}>
-                                    Move list
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleMoveAllCards(column)}>
-                                    Move all cards in this list
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleSortList(column)}>
-                                    Sort by...
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => setShowColorPicker(show => (show => show === column ? null : column))}>
-                                    Change list color
-                                </Dropdown.Item>
-                                {showColorPicker === column && (
-                                    <div style={{ position: 'absolute', zIndex: 2 }}>
-                                        <SketchPicker
-                                            color={listColors[column] || '#2c3e50'}
-                                            onChangeComplete={(color) => handleChangeListColor(column, color)}
-                                        />
+                            </button>
+                            {isDropdownOpen && (
+                                <div
+                                    className="custom-dropdown-menu"
+                                    style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        right: 0,
+                                        zIndex: 1000,
+                                        width: '200px',
+                                        minWidth: '200px',
+                                        maxWidth: '200px',
+                                        backgroundColor: 'white',
+                                        border: '1px solid #ccc',
+                                        borderRadius: '4px',
+                                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                                        padding: '5px 0',
+                                    }}
+                                >
+                                    <div
+                                        className="dropdown-item"
+                                        onClick={() => {
+                                            setShowInput({ ...showInput, [column]: true });
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
+                                    >
+                                        Add card
                                     </div>
-                                )}
-                                <Dropdown.Divider />
-                                <Dropdown.Item onClick={() => { setRenamingList(column); setRenameValue(column); }}>
-                                    Rename
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleDeleteList(column)} className="text-danger">
-                                    Delete
-                                </Dropdown.Item>
-                            </Dropdown.Menu>
-                        </Dropdown>
+                                    <div
+                                        className="dropdown-item"
+                                        onClick={() => {
+                                            handleCopyList(column);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
+                                    >
+                                        Copy list
+                                    </div>
+                                    <div
+                                        className="dropdown-item"
+                                        onClick={() => {
+                                            handleMoveList(column);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
+                                    >
+                                        Move list
+                                    </div>
+                                    <div
+                                        className="dropdown-item"
+                                        onClick={() => {
+                                            handleMoveAllCards(column);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
+                                    >
+                                        Move all cards in this list
+                                    </div>
+                                    <div
+                                        className="dropdown-item"
+                                        onClick={() => {
+                                            handleSortList(column);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
+                                    >
+                                        Sort by...
+                                    </div>
+                                    <div
+                                        className="dropdown-item"
+                                        onClick={() => {
+                                            setShowColorPicker(show => (show => show === column ? null : column));
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
+                                    >
+                                        Change list color
+                                    </div>
+                                    {showColorPicker === column && (
+                                        <div style={{ position: 'absolute', zIndex: 1001, right: '100%', top: 0 }}>
+                                            <SketchPicker
+                                                color={listColors[column] || '#2c3e50'}
+                                                onChangeComplete={(color) => handleChangeListColor(column, color)}
+                                            />
+                                        </div>
+                                    )}
+                                    <hr style={{ margin: '5px 0' }} />
+                                    <div
+                                        className="dropdown-item"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setRenamingList(column);
+                                            setRenameValue(column);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
+                                    >
+                                        Rename
+                                    </div>
+                                    <div
+                                        className="dropdown-item text-danger"
+                                        onClick={() => {
+                                            handleDeleteList(column);
+                                            setIsDropdownOpen(false);
+                                        }}
+                                        style={{ padding: '5px 10px', cursor: 'pointer', color: '#dc3545' }}
+                                    >
+                                        Delete
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    <div className='card-body p-2'>
+                    <div
+                        className='card-body p-2'
+                        style={{
+                            maxHeight: '400px',
+                            overflowY: 'auto',
+                        }}
+                    >
                         {renamingList === column ? (
                             <div className='d-flex gap-2 mb-2'>
                                 <input
+                                    ref={inputRef}
                                     type='text'
                                     className='form-control'
                                     value={renameValue}
                                     onChange={(e) => setRenameValue(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => e.stopPropagation()}
                                     style={{ backgroundColor: '#34495e', color: 'white', border: 'none' }}
                                 />
                                 <button className='btn btn-success btn-sm' onClick={() => handleRenameList(column)}>
@@ -372,18 +455,13 @@ function Board({ userId }) {
                             </div>
                         ) : (
                             <>
-                                <SortableContext
-                                    items={filteredCards.map(card => card.id) || []}
-                                    strategy={horizontalListSortingStrategy}
-                                >
-                                    {filteredCards.length === 0 ? (
-                                        <p className='text-white'>No cards yet.</p>
-                                    ) : (
-                                        filteredCards.map((card) => (
-                                            <SortableCard key={card.id} card={card} />
-                                        ))
-                                    )}
-                                </SortableContext>
+                                {filteredCards.length === 0 ? (
+                                    <p className='text-white'>No cards yet.</p>
+                                ) : (
+                                    filteredCards.map((card) => (
+                                        <SimpleCard key={card.id} card={card} />
+                                    ))
+                                )}
                                 {!showInput[column] ? (
                                     <button
                                         className='btn btn-link text-white'
@@ -395,11 +473,14 @@ function Board({ userId }) {
                                 ) : (
                                     <div className='card p-2 mb-2' style={{ backgroundColor: '#34495e', border: 'none' }}>
                                         <input
+                                            ref={addCardInputRef}
                                             type='text'
                                             className='form-control mb-2'
                                             placeholder='Enter card title'
                                             value={newCardTitle}
                                             onChange={(e) => setNewCardTitle(e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onKeyDown={(e) => e.stopPropagation()}
                                             style={{ backgroundColor: '#2c3e50', color: 'white', border: 'none' }}
                                         />
                                         <div className='d-flex gap-2'>
@@ -420,12 +501,16 @@ function Board({ userId }) {
         );
     };
 
-    const SortableCard = ({ card }) => {
-        const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: card.id });
+    const SimpleCard = ({ card }) => {
+        const inputRef = React.useRef(null);
+
+        React.useEffect(() => {
+            if (editingCard === card.id && inputRef.current) {
+                inputRef.current.focus();
+            }
+        }, [card.id]);
 
         const style = {
-            transform: CSS.Transform.toString(transform),
-            transition,
             backgroundColor: '#34495e',
             border: 'none',
             borderLeft: `4px solid ${card.color || 'orange'}`,
@@ -433,21 +518,18 @@ function Board({ userId }) {
         };
 
         return (
-            <div
-                ref={setNodeRef}
-                style={style}
-                {...attributes}
-                {...listeners}
-                className='card mb-2'
-            >
+            <div style={style} className='card mb-2'>
                 <div className='card-body p-2 d-flex justify-content-between align-items-center'>
                     {editingCard === card.id ? (
                         <div className='d-flex gap-2 w-100'>
                             <input
+                                ref={inputRef}
                                 type='text'
                                 className='form-control'
                                 value={editCardTitle}
                                 onChange={(e) => setEditCardTitle(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.stopPropagation()}
                                 style={{ backgroundColor: '#2c3e50', color: 'white', border: 'none' }}
                             />
                             <button className='btn btn-success btn-sm' onClick={() => handleEditCard(card)}>
@@ -461,7 +543,14 @@ function Board({ userId }) {
                         <>
                             <p className='card-text text-white mb-0'>{card.title}</p>
                             <div className='d-flex gap-1'>
-                                <button className='btn btn-sm btn-outline-light' onClick={() => { setEditingCard(card.id); setEditCardTitle(card.title); }}>
+                                <button
+                                    className='btn btn-sm btn-outline-light'
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingCard(card.id);
+                                        setEditCardTitle(card.title);
+                                    }}
+                                >
                                     Edit
                                 </button>
                                 <button className='btn btn-sm btn-outline-danger' onClick={() => handleDeleteCard(card.id)}>
@@ -492,7 +581,7 @@ function Board({ userId }) {
 
     console.log("Rendering Board with cards:", cards);
     return (
-        <div className='d-flex vh-100 p-4' style={{ backgroundColor: '#1a2a44' }}>
+        <div className='d-flex p-4' style={{ backgroundColor: '#1a2a44', minHeight: '100vh' }}>
             <div className='container-fluid'>
                 <div className='d-flex justify-content-between align-items-center mb-4'>
                     <h2 className='text-white'>Board</h2>
@@ -521,15 +610,11 @@ function Board({ userId }) {
                         )}
                     </div>
                 </div>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={lists} strategy={horizontalListSortingStrategy}>
-                        <div className='d-flex gap-3' style={{ overflowX: 'auto' }}>
-                            {lists.map((column) => (
-                                <SortableList key={column} column={column} />
-                            ))}
-                        </div>
-                    </SortableContext>
-                </DndContext>
+                <div className='d-flex gap-3' style={{ overflowX: 'auto' }}>
+                    {lists.map((column) => (
+                        <SimpleList key={column} column={column} />
+                    ))}
+                </div>
             </div>
         </div>
     );
