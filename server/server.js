@@ -142,15 +142,22 @@ app.post('/lists', (req, res) => {
 });
 
 // Delete a list
-app.delete('/lists', (req, res) => {
-    const { userId, name } = req.body;
-    const sql = "DELETE FROM lists WHERE user_id = ? AND name = ?";
-    db.query(sql, [userId, name], (err, data) => {
+// DELETE /cards/:id - Delete a card by ID
+app.delete('/cards/:id', (req, res) => {
+    const cardId = req.params.id;
+    const query = 'DELETE FROM cards WHERE id = ?';
+    db.query(query, [cardId], (err, result) => {
         if (err) {
-            console.error("Error deleting list:", err);
-            return res.json("Error");
+            console.error('Error deleting card:', err);
+            res.status(500).send("Error");
+            return;
         }
-        return res.json("List Deleted");
+        if (result.affectedRows === 0) {
+            // No card found with the given ID
+            res.status(404).send("Card Not Found");
+            return;
+        }
+        res.send("Card Deleted");
     });
 });
 
