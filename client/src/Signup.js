@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 
 function Signup() {
     const [email, setEmail] = useState('');
@@ -39,9 +40,12 @@ function Signup() {
                             required
                         />
                     </div>
-                    <button className='btn btn-success'>Sign Up</button>
+                    <button className='btn btn-success w-100'>Sign Up</button>
                 </form>
-                {message && <p>{message}</p>}
+                {message && <p className='mt-3 text-center'>{message}</p>}
+                <p className='mt-3 text-center'>
+                    Already have an account? <Link to="/login">Login here</Link>
+                </p>
             </div>
         </div>
     );
