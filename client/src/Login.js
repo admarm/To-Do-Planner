@@ -12,20 +12,20 @@ function Login({ setIsLoggedIn, setUserId }) {
     function handleSubmit(event) {
         event.preventDefault();
         axios.post('http://localhost:5000/login', { email, password })
-        .then(res => {
-            console.log("Login response:", res.data); // Debug the response
-            if (res.data.message) {
-                setMessage(res.data.message);
-                if (res.data.message === "Login Successful") {
-                    setIsLoggedIn(true);
-                    setUserId(res.data.userId);
-                    setTimeout(() => navigate('/board'), 1000);
+            .then(res => {
+                console.log("Login response:", res.data);
+                if (res.data.message) {
+                    setMessage(res.data.message);
+                    if (res.data.message === "Login Successful") {
+                        setIsLoggedIn(true);
+                        setUserId(res.data.userId);
+                        navigate('/board');
+                    }
+                } else {
+                    setMessage(res.data);
                 }
-            } else {
-                setMessage(res.data);
-            }
-        })
-        .catch(err => setMessage('Request failed'));
+            })
+            .catch(err => setMessage('Request failed'));
     }
 
     return (
