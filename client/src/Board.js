@@ -12,9 +12,9 @@ function Board({ userId }) {
 
     const [newCardTitle, setNewCardTitle] = useState('');
     const [showInput, setShowInput] = useState({});
-    const [lists, setLists] = useState([]); // Initialize as empty; will fetch from backend
+    const [lists, setLists] = useState([]);
     const [listColors, setListColors] = useState({});
-    const [listIds, setListIds] = useState({}); // Store list IDs from the backend
+    const [listIds, setListIds] = useState({});
     const [newListName, setNewListName] = useState('');
     const [showListInput, setShowListInput] = useState(false);
     const [renamingList, setRenamingList] = useState(null);
@@ -22,14 +22,15 @@ function Board({ userId }) {
     const [editingCard, setEditingCard] = useState(null);
     const [editCardTitle, setEditCardTitle] = useState('');
     const [showColorPicker, setShowColorPicker] = useState(null);
-    const [boardName, setBoardName] = useState('Board'); // Initialize as default; will fetch from backend
+    const [boardName, setBoardName] = useState('My Board');
     const [renamingBoard, setRenamingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
+    const [isLoadingBoard, setIsLoadingBoard] = useState(true);
 
     // Fetch board name, lists, and cards when userId changes
     useEffect(() => {
         if (userId) {
-            // Fetch board and lists
+            setIsLoadingBoard(true);
             axios.get(`http://localhost:5000/boards/${userId}`)
                 .then(res => {
                     console.log("Fetched board and lists:", res.data);
@@ -47,10 +48,10 @@ function Board({ userId }) {
                 })
                 .catch(err => {
                     console.error("Error fetching board and lists:", err);
-                    alert('Error fetching board and lists');
-                });
+                    alert('Error fetching board and lists. Please try refreshing the page.');
+                })
+                .finally(() => setIsLoadingBoard(false));
 
-            // Fetch cards
             dispatch(setCards([]));
             dispatch(fetchCards(userId));
         }
@@ -121,7 +122,7 @@ function Board({ userId }) {
             })
             .catch(err => {
                 console.error("Error adding list:", err);
-                alert('Error adding list');
+                alert(err.response?.data || 'Error adding list');
             });
     };
 
@@ -214,7 +215,7 @@ function Board({ userId }) {
             })
             .catch(err => {
                 console.error("Error renaming list:", err);
-                alert('Error renaming list');
+                alert(err.response?.data || 'Error renaming list');
             });
     };
 
@@ -301,7 +302,7 @@ function Board({ userId }) {
             })
             .catch(err => {
                 console.error("Error copying list:", err);
-                alert('Error copying list');
+                alert(err.response?.data || 'Error copying list');
             });
     };
 
@@ -342,10 +343,21 @@ function Board({ userId }) {
     };
 
     const handleChangeListColor = (listName, color) => {
-        setListColors(prev => ({ ...prev, [listName]: color.hex }));
-        setShowColorPicker(null);
-        // Optionally, you can add an API call to save the color to the backend
-        // For simplicity, we're keeping it in state, but you can extend this
+        const listId = listIds[listName];
+        axios.put(`http://localhost:5000/lists/${listId}/color`, { color: color.hex })
+            .then(res => {
+                console.log("Update list color response:", res.data);
+                if (res.data.message === 'List color updated') {
+                    setListColors(prev => ({ ...prev, [listName]: color.hex }));
+                    setShowColorPicker(null);
+                } else {
+                    alert('Failed to update list color');
+                }
+            })
+            .catch(err => {
+                console.error("Error updating list color:", err);
+                alert(err.response?.data || 'Error updating list color');
+            });
     };
 
     const handleRenameBoard = () => {
@@ -366,7 +378,7 @@ function Board({ userId }) {
             })
             .catch(err => {
                 console.error("Error renaming board:", err);
-                alert('Error renaming board');
+                alert(err.response?.data || 'Error renaming board');
             });
     };
 
@@ -695,7 +707,7 @@ function Board({ userId }) {
         return <div className="text-white">User ID is not available. Please log in again.</div>;
     }
 
-    if (isLoading) {
+    if (isLoadingBoard || isLoading) {
         console.log("Board is loading...");
         return <div className="text-white">Loading...</div>;
     }
