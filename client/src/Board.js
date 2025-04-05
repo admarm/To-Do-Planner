@@ -260,6 +260,13 @@ function Board({ userId }) {
         const addCardInputRef = React.useRef(null);
         const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+        // Sanitize the column name for use in CSS selectors
+        const sanitizeColumnName = (name) => {
+            return name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
+        };
+
+        const sanitizedColumn = sanitizeColumnName(column);
+
         React.useEffect(() => {
             if (renamingList === column && inputRef.current) {
                 inputRef.current.focus();
@@ -275,7 +282,11 @@ function Board({ userId }) {
         // Close dropdown when clicking outside
         React.useEffect(() => {
             const handleClickOutside = (event) => {
-                if (isDropdownOpen && !event.target.closest(`#dropdown-${column}`) && !event.target.closest('.custom-dropdown-menu')) {
+                if (
+                    isDropdownOpen &&
+                    !event.target.closest(`#dropdown-${sanitizedColumn}`) &&
+                    !event.target.closest('.custom-dropdown-menu')
+                ) {
                     setIsDropdownOpen(false);
                 }
             };
@@ -283,7 +294,7 @@ function Board({ userId }) {
             return () => {
                 document.removeEventListener('mousedown', handleClickOutside);
             };
-        }, [isDropdownOpen, column]);
+        }, [isDropdownOpen, sanitizedColumn]);
 
         console.log('Cards state before rendering list:', cards);
         const filteredCards = (cards || []).filter(card => (card.column_name || '').trim() === column);
@@ -307,7 +318,7 @@ function Board({ userId }) {
                         </h5>
                         <div style={{ width: '30px', textAlign: 'center', position: 'relative' }}>
                             <button
-                                id={`dropdown-${column}`}
+                                id={`dropdown-${sanitizedColumn}`}
                                 className="text-white p-0"
                                 style={{ background: 'none', border: 'none', textDecoration: 'none', width: '30px', textAlign: 'center' }}
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
