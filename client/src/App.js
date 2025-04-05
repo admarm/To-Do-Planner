@@ -14,11 +14,20 @@ function App() {
         return localStorage.getItem('userId') || null;
     });
     const [selectedBoardId, setSelectedBoardId] = useState(null);
+    const [isDarkTheme, setIsDarkTheme] = useState(() => {
+        return localStorage.getItem('theme') === 'dark';
+    });
 
     useEffect(() => {
         localStorage.setItem('isLoggedIn', isLoggedIn);
         localStorage.setItem('userId', userId);
-    }, [isLoggedIn, userId]);
+        localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
+        if (isDarkTheme) {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
+    }, [isLoggedIn, userId, isDarkTheme]);
 
     const handleLogout = () => {
         setIsLoggedIn(false);
@@ -26,6 +35,10 @@ function App() {
         setSelectedBoardId(null);
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('userId');
+    };
+
+    const toggleTheme = () => {
+        setIsDarkTheme(prev => !prev);
     };
 
     return (
@@ -47,6 +60,13 @@ function App() {
                         </button>
                         <div className="collapse navbar-collapse" id="navbarNav">
                             <div className="navbar-nav ms-auto">
+                                <button
+                                    className="nav-link theme-toggle-btn"
+                                    onClick={toggleTheme}
+                                    title={isDarkTheme ? "Switch to Light Theme" : "Switch to Dark Theme"}
+                                >
+                                    {isDarkTheme ? <i className="bi bi-sun-fill"></i> : <i className="bi bi-moon-fill"></i>}
+                                </button>
                                 {!isLoggedIn ? (
                                     <>
                                         <Link className="nav-link" to="/login">Login</Link>
