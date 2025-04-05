@@ -1,51 +1,58 @@
 import React, { useState } from 'react';
-import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 function Signup() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [message, setMessage] = useState('');
+    const [error, setError] = useState('');
+    const navigate = useNavigate();
 
-    function handleSubmit(event) {
-        event.preventDefault();
+    const handleSignup = (e) => {
+        e.preventDefault();
         axios.post('http://localhost:5000/signup', { email, password })
-            .then(res => setMessage(res.data))
-            .catch(err => setMessage('Request failed'));
-    }
+            .then(res => {
+                if (res.data === "Signup Successful") {
+                    navigate('/login');
+                } else {
+                    setError('Email already exists');
+                }
+            })
+            .catch(err => {
+                setError('Error signing up. Please try again.');
+            });
+    };
 
     return (
-        <div className='d-flex vh-100 justify-content-center align-items-center bg-primary'>
-            <div className='p-3 bg-white w-25'>
-                <h2>Sign Up</h2>
-                <form onSubmit={handleSubmit}>
-                    <div className='mb-3'>
-                        <label htmlFor='email'>Email</label>
+        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '80vh' }}>
+            <div className="card p-4 fade-in" style={{ maxWidth: '400px', width: '100%' }}>
+                <h2 className="text-center mb-4" style={{ fontWeight: 600 }}>Sign Up</h2>
+                {error && <div className="alert alert-danger">{error}</div>}
+                <form onSubmit={handleSignup}>
+                    <div className="mb-3">
+                        <label htmlFor="email" className="form-label">Email</label>
                         <input
-                            type='email'
-                            placeholder='Enter Email'
-                            className='form-control'
-                            onChange={e => setEmail(e.target.value)}
+                            type="email"
+                            className="form-control"
+                            id="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             required
                         />
                     </div>
-                    <div className='mb-3'>
-                        <label htmlFor='password'>Password</label>
+                    <div className="mb-3">
+                        <label htmlFor="password" className="form-label">Password</label>
                         <input
-                            type='password'
-                            placeholder='Enter Password'
-                            className='form-control'
-                            onChange={e => setPassword(e.target.value)}
+                            type="password"
+                            className="form-control"
+                            id="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
                             required
                         />
                     </div>
-                    <button className='btn btn-success w-100'>Sign Up</button>
+                    <button type="submit" className="btn btn-primary w-100">Sign Up</button>
                 </form>
-                {message && <p className='mt-3 text-center'>{message}</p>}
-                <p className='mt-3 text-center'>
-                    Already have an account? <Link to="/login">Login here</Link>
-                </p>
             </div>
         </div>
     );

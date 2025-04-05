@@ -1,4 +1,3 @@
-// Board.js
 import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
@@ -8,8 +7,7 @@ import { fetchCards, addCard, updateCard, deleteCard, setCards } from './store';
 import { useParams } from 'react-router-dom';
 
 function Board({ userId }) {
-    const { boardId } = useParams(); // Get boardId from URL
-    console.log("Board component rendered with userId:", userId, "boardId:", boardId);
+    const { boardId } = useParams();
     const dispatch = useDispatch();
     const { cards = [], isLoading, error } = useSelector((state) => state.cards);
 
@@ -30,13 +28,11 @@ function Board({ userId }) {
     const [newBoardName, setNewBoardName] = useState('');
     const [isLoadingBoard, setIsLoadingBoard] = useState(true);
 
-    // Fetch board name, lists, and cards when boardId changes
     useEffect(() => {
         if (userId && boardId) {
             setIsLoadingBoard(true);
             axios.get(`http://localhost:5000/boards/${boardId}`)
                 .then(res => {
-                    console.log("Fetched board and lists:", res.data);
                     setBoardName(res.data.boardName);
                     const fetchedLists = res.data.lists.map(list => list.name);
                     const fetchedColors = {};
@@ -70,13 +66,10 @@ function Board({ userId }) {
             return;
         }
         const newCardData = { userId, title: newCardTitle, color: 'orange', column_name: columnName };
-        console.log("Adding card with data:", newCardData);
         axios.post('http://localhost:5000/cards', newCardData)
             .then(res => {
-                console.log("Add card response:", res.data);
                 const message = res.data.message ? res.data.message.trim() : '';
                 if (message === "Card Added") {
-                    console.log("Card added successfully, updating state...");
                     const newCard = {
                         id: res.data.cardId,
                         title: newCardTitle,
@@ -87,13 +80,11 @@ function Board({ userId }) {
                     setNewCardTitle('');
                     setShowInput(prev => ({ ...prev, [columnName]: false }));
                 } else {
-                    console.error('Unexpected response:', res.data);
                     alert('Failed to add card');
                     dispatch(fetchCards({ userId, boardId }));
                 }
             })
             .catch(err => {
-                console.error('Error adding card:', err);
                 alert('Error adding card');
                 dispatch(fetchCards({ userId, boardId }));
             });
@@ -111,7 +102,6 @@ function Board({ userId }) {
         const newList = { boardId, name: newListName.trim(), color: '#2c3e50' };
         axios.post('http://localhost:5000/lists', newList)
             .then(res => {
-                console.log("Add list response:", res.data);
                 if (res.data.message === 'List added') {
                     const newListNameTrimmed = newListName.trim();
                     setLists([...lists, newListNameTrimmed]);
@@ -124,7 +114,6 @@ function Board({ userId }) {
                 }
             })
             .catch(err => {
-                console.error("Error adding list:", err);
                 alert(err.response?.data || 'Error adding list');
             });
     };
@@ -134,7 +123,6 @@ function Board({ userId }) {
             const listId = listIds[listName];
             axios.delete(`http://localhost:5000/lists/${listId}`)
                 .then(res => {
-                    console.log("Delete list response:", res.data);
                     if (res.data.message === 'List deleted') {
                         const updatedCards = cards.map(card => {
                             if ((card.column_name || '').trim() === listName) {
@@ -144,9 +132,7 @@ function Board({ userId }) {
                         });
                         dispatch(setCards(updatedCards));
                         axios.put('http://localhost:5000/cards/move', { userId, fromList: listName, toList: 'Tasks' })
-                            .then(res => {
-                                console.log("Cards moved:", res.data);
-                            })
+                            .then(res => {})
                             .catch(err => console.error("Error moving cards:", err));
                         setLists(lists.filter(list => list !== listName));
                         setListColors(prev => {
@@ -164,7 +150,6 @@ function Board({ userId }) {
                     }
                 })
                 .catch(err => {
-                    console.error("Error deleting list:", err);
                     alert('Error deleting list');
                 });
         }
@@ -182,18 +167,12 @@ function Board({ userId }) {
         const listId = listIds[oldName];
         axios.put(`http://localhost:5000/lists/${listId}`, { name: renameValue.trim() })
             .then(res => {
-                console.log("Rename list response:", res.data);
                 if (res.data.message === 'List renamed') {
-                    // First, update the list name in the frontend state
                     const updatedLists = lists.map(list => (list === oldName ? renameValue.trim() : list));
                     setLists(updatedLists);
-    
-                    // Then, update the cards' column_name in the backend
-                    axios.put('http://localhost:5000/cards/rename', { userId, oldName, newName: renameValue.trim() })
+                    axios.put('http://localhost:5000/cards/rename-list', { userId, oldName, newName: renameValue.trim() })
                         .then(res => {
-                            console.log("Cards renamed:", res.data);
                             if (res.data === "Cards Renamed") {
-                                // Update the cards in the frontend state
                                 const updatedCards = cards.map(card => {
                                     if ((card.column_name || '').trim() === oldName) {
                                         return { ...card, column_name: renameValue.trim() };
@@ -201,8 +180,6 @@ function Board({ userId }) {
                                     return card;
                                 });
                                 dispatch(setCards(updatedCards));
-    
-                                // Update listColors and listIds
                                 setListColors(prev => {
                                     const newColors = { ...prev };
                                     newColors[renameValue.trim()] = newColors[oldName];
@@ -215,33 +192,26 @@ function Board({ userId }) {
                                     delete newIds[oldName];
                                     return newIds;
                                 });
-    
-                                // Reset the renaming state
                                 setRenamingList(null);
                                 setRenameValue('');
                             } else {
-                                // If the cards rename fails, revert the list rename
                                 alert('Failed to update cards. Reverting list name change.');
                                 axios.put(`http://localhost:5000/lists/${listId}`, { name: oldName })
                                     .then(() => {
-                                        setLists(lists); // Revert the lists state
+                                        setLists(lists);
                                     })
                                     .catch(err => {
-                                        console.error("Error reverting list name:", err);
                                         alert('Error reverting list name. Please refresh the page.');
                                     });
                             }
                         })
                         .catch(err => {
-                            console.error("Error renaming cards:", err);
                             alert(err.response?.data || 'Error renaming cards. Reverting list name change.');
-                            // Revert the list rename
                             axios.put(`http://localhost:5000/lists/${listId}`, { name: oldName })
                                 .then(() => {
-                                    setLists(lists); // Revert the lists state
+                                    setLists(lists);
                                 })
                                 .catch(err => {
-                                    console.error("Error reverting list name:", err);
                                     alert('Error reverting list name. Please refresh the page.');
                                 });
                         });
@@ -250,7 +220,6 @@ function Board({ userId }) {
                 }
             })
             .catch(err => {
-                console.error("Error renaming list:", err);
                 alert(err.response?.data || 'Error renaming list');
             });
     };
@@ -260,31 +229,35 @@ function Board({ userId }) {
             alert('Please enter a card title');
             return;
         }
-        dispatch(updateCard({ id: card.id, updates: { title: editCardTitle.trim() } }));
         axios.put(`http://localhost:5000/cards/${card.id}`, { title: editCardTitle.trim() })
             .then(res => {
-                console.log("Card updated:", res.data);
+                if (res.data === "Card Updated") {
+                    dispatch(updateCard({ id: card.id, updates: { title: editCardTitle.trim() } }));
+                    setEditingCard(null);
+                    setEditCardTitle('');
+                } else {
+                    alert('Failed to update card');
+                    dispatch(fetchCards({ userId, boardId }));
+                }
             })
-            .catch(err => console.error("Error updating card:", err));
-        setEditingCard(null);
-        setEditCardTitle('');
+            .catch(err => {
+                alert(err.response?.data || 'Error updating card');
+                dispatch(fetchCards({ userId, boardId }));
+            });
     };
 
     const handleDeleteCard = (cardId) => {
         if (window.confirm('Are you sure you want to delete this card?')) {
             axios.delete(`http://localhost:5000/cards/${cardId}`)
                 .then(res => {
-                    console.log("Delete card response:", res.data);
                     if (res.data === "Card Deleted") {
                         dispatch(deleteCard(cardId));
                     } else {
-                        console.error("Unexpected response:", res.data);
                         alert('Failed to delete card');
                         dispatch(fetchCards({ userId, boardId }));
                     }
                 })
                 .catch(err => {
-                    console.error("Error deleting card:", err);
                     if (err.response && err.response.status === 404) {
                         alert('Card not found. It may have already been deleted.');
                         dispatch(deleteCard(cardId));
@@ -305,7 +278,6 @@ function Board({ userId }) {
         const newList = { boardId, name: newListName, color: listColors[listName] || '#2c3e50' };
         axios.post('http://localhost:5000/lists', newList)
             .then(res => {
-                console.log("Copy list response:", res.data);
                 if (res.data.message === 'List added') {
                     setLists([...lists, newListName]);
                     setListColors(prev => ({ ...prev, [newListName]: listColors[listName] || '#2c3e50' }));
@@ -337,7 +309,6 @@ function Board({ userId }) {
                 }
             })
             .catch(err => {
-                console.error("Error copying list:", err);
                 alert(err.response?.data || 'Error copying list');
             });
     };
@@ -365,9 +336,7 @@ function Board({ userId }) {
         });
         dispatch(setCards(updatedCards));
         axios.put('http://localhost:5000/cards/move', { userId, fromList: listName, toList: targetList })
-            .then(res => {
-                console.log("Cards moved:", res.data);
-            })
+            .then(res => {})
             .catch(err => console.error("Error moving cards:", err));
     };
 
@@ -382,16 +351,14 @@ function Board({ userId }) {
         const listId = listIds[listName];
         axios.put(`http://localhost:5000/lists/${listId}/color`, { color: color.hex })
             .then(res => {
-                console.log("Update list color response:", res.data);
                 if (res.data.message === 'List color updated') {
-                    setListColors(prev => ({ ...prev, [newListName]: color.hex }));
+                    setListColors(prev => ({ ...prev, [listName]: color.hex }));
                     setShowColorPicker(null);
                 } else {
                     alert('Failed to update list color');
                 }
             })
             .catch(err => {
-                console.error("Error updating list color:", err);
                 alert(err.response?.data || 'Error updating list color');
             });
     };
@@ -403,7 +370,6 @@ function Board({ userId }) {
         }
         axios.put(`http://localhost:5000/boards/${boardId}`, { name: newBoardName.trim() })
             .then(res => {
-                console.log("Rename board response:", res.data);
                 if (res.data.message === 'Board name updated') {
                     setBoardName(newBoardName.trim());
                     setRenamingBoard(false);
@@ -413,7 +379,6 @@ function Board({ userId }) {
                 }
             })
             .catch(err => {
-                console.error("Error renaming board:", err);
                 alert(err.response?.data || 'Error renaming board');
             });
     };
@@ -457,16 +422,14 @@ function Board({ userId }) {
             };
         }, [isDropdownOpen, sanitizedColumn]);
 
-        console.log('Cards state before rendering list:', cards);
         const filteredCards = (cards || []).filter(card => (card.column_name || '').trim() === column);
-        console.log(`Filtered cards for column ${column}:`, filteredCards);
 
         return (
-            <div className='flex-shrink-0' style={{ width: '300px' }}>
-                <div className='card mb-3' style={{ backgroundColor: listColors[column] || '#2c3e50', border: 'none', overflow: 'visible' }}>
-                    <div className='card-header text-white d-flex justify-content-between align-items-center' style={{ width: '100%' }}>
+            <div className="flex-shrink-0 list-card fade-in" style={{ width: '300px' }}>
+                <div className="card mb-3">
+                    <div className="card-header text-white">
                         <h5
-                            className='mb-0'
+                            className="mb-0"
                             style={{
                                 maxWidth: '200px',
                                 whiteSpace: 'nowrap',
@@ -484,7 +447,7 @@ function Board({ userId }) {
                                 style={{ background: 'none', border: 'none', textDecoration: 'none', width: '30px', textAlign: 'center' }}
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                             >
-                                ...
+                                <i className="bi bi-three-dots-vertical"></i>
                             </button>
                             {isDropdownOpen && (
                                 <div
@@ -498,9 +461,6 @@ function Board({ userId }) {
                                         minWidth: '200px',
                                         maxWidth: '200px',
                                         backgroundColor: 'white',
-                                        border: '1px solid #ccc',
-                                        borderRadius: '4px',
-                                        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
                                         padding: '5px 0',
                                     }}
                                 >
@@ -510,7 +470,6 @@ function Board({ userId }) {
                                             setShowInput({ ...showInput, [column]: true });
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
                                     >
                                         Add card
                                     </div>
@@ -520,7 +479,6 @@ function Board({ userId }) {
                                             handleCopyList(column);
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
                                     >
                                         Copy list
                                     </div>
@@ -530,7 +488,6 @@ function Board({ userId }) {
                                             handleMoveList(column);
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
                                     >
                                         Move list
                                     </div>
@@ -540,7 +497,6 @@ function Board({ userId }) {
                                             handleMoveAllCards(column);
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
                                     >
                                         Move all cards in this list
                                     </div>
@@ -550,7 +506,6 @@ function Board({ userId }) {
                                             handleSortList(column);
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
                                     >
                                         Sort by...
                                     </div>
@@ -560,7 +515,6 @@ function Board({ userId }) {
                                             setShowColorPicker(show => (show => show === column ? null : column));
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
                                     >
                                         Change list color
                                     </div>
@@ -581,7 +535,6 @@ function Board({ userId }) {
                                             setRenameValue(column);
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: 'black' }}
                                     >
                                         Rename
                                     </div>
@@ -591,7 +544,6 @@ function Board({ userId }) {
                                             handleDeleteList(column);
                                             setIsDropdownOpen(false);
                                         }}
-                                        style={{ padding: '5px 10px', cursor: 'pointer', color: '#dc3545' }}
                                     >
                                         Delete
                                     </div>
@@ -600,35 +552,34 @@ function Board({ userId }) {
                         </div>
                     </div>
                     <div
-                        className='card-body p-2'
+                        className="card-body"
                         style={{
                             maxHeight: '400px',
                             overflowY: 'auto',
                         }}
                     >
                         {renamingList === column ? (
-                            <div className='d-flex gap-2 mb-2'>
+                            <div className="d-flex gap-2 mb-2">
                                 <input
                                     ref={inputRef}
-                                    type='text'
-                                    className='form-control'
+                                    type="text"
+                                    className="form-control"
                                     value={renameValue}
                                     onChange={(e) => setRenameValue(e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
                                     onKeyDown={(e) => e.stopPropagation()}
-                                    style={{ backgroundColor: '#34495e', color: 'white', border: 'none' }}
                                 />
-                                <button className='btn btn-success btn-sm' onClick={() => handleRenameList(column)}>
+                                <button className="btn btn-success btn-sm" onClick={() => handleRenameList(column)}>
                                     Save
                                 </button>
-                                <button className='btn btn-secondary btn-sm' onClick={() => setRenamingList(null)}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => setRenamingList(null)}>
                                     Cancel
                                 </button>
                             </div>
                         ) : (
                             <>
                                 {filteredCards.length === 0 ? (
-                                    <p className='text-white'>No cards yet.</p>
+                                    <p className="text-secondary">No cards yet.</p>
                                 ) : (
                                     filteredCards.map((card) => (
                                         <SimpleCard key={card.id} card={card} />
@@ -636,30 +587,29 @@ function Board({ userId }) {
                                 )}
                                 {!showInput[column] ? (
                                     <button
-                                        className='btn btn-link text-white'
+                                        className="btn btn-link text-primary"
                                         onClick={() => setShowInput({ ...showInput, [column]: true })}
-                                        style={{ textDecoration: 'none' }}
+                                        style={{ textDecoration: 'none', fontWeight: 600 }}
                                     >
                                         + Add a card
                                     </button>
                                 ) : (
-                                    <div className='card p-2 mb-2' style={{ backgroundColor: '#34495e', border: 'none' }}>
+                                    <div className="card p-2 mb-2">
                                         <input
                                             ref={addCardInputRef}
-                                            type='text'
-                                            className='form-control mb-2'
-                                            placeholder='Enter card title'
+                                            type="text"
+                                            className="form-control mb-2"
+                                            placeholder="Enter card title"
                                             value={newCardTitle}
                                             onChange={(e) => setNewCardTitle(e.target.value)}
                                             onClick={(e) => e.stopPropagation()}
                                             onKeyDown={(e) => e.stopPropagation()}
-                                            style={{ backgroundColor: '#2c3e50', color: 'white', border: 'none' }}
                                         />
-                                        <div className='d-flex gap-2'>
-                                            <button className='btn btn-success btn-sm' onClick={() => handleAddCard(column)}>
+                                        <div className="d-flex gap-2">
+                                            <button className="btn btn-success btn-sm" onClick={() => handleAddCard(column)}>
                                                 Add
                                             </button>
-                                            <button className='btn btn-secondary btn-sm' onClick={() => setShowInput({ ...showInput, [column]: false })}>
+                                            <button className="btn btn-secondary btn-sm" onClick={() => setShowInput({ ...showInput, [column]: false })}>
                                                 Cancel
                                             </button>
                                         </div>
@@ -682,41 +632,33 @@ function Board({ userId }) {
             }
         }, [card.id]);
 
-        const style = {
-            backgroundColor: '#34495e',
-            border: 'none',
-            borderLeft: `4px solid ${card.color || 'orange'}`,
-            borderRadius: '4px',
-        };
-
         return (
-            <div style={style} className='card mb-2'>
-                <div className='card-body p-2 d-flex justify-content-between align-items-center'>
+            <div className="simple-card card mb-2">
+                <div className="card-body p-2 d-flex justify-content-between align-items-center">
                     {editingCard === card.id ? (
-                        <div className='d-flex gap-2 w-100'>
+                        <div className="d-flex gap-2 w-100">
                             <input
                                 ref={inputRef}
-                                type='text'
-                                className='form-control'
+                                type="text"
+                                className="form-control"
                                 value={editCardTitle}
                                 onChange={(e) => setEditCardTitle(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                                 onKeyDown={(e) => e.stopPropagation()}
-                                style={{ backgroundColor: '#2c3e50', color: 'white', border: 'none' }}
                             />
-                            <button className='btn btn-success btn-sm' onClick={() => handleEditCard(card)}>
+                            <button className="btn btn-success btn-sm" onClick={() => handleEditCard(card)}>
                                 Save
                             </button>
-                            <button className='btn btn-secondary btn-sm' onClick={() => setEditingCard(null)}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setEditingCard(null)}>
                                 Cancel
                             </button>
                         </div>
                     ) : (
                         <>
-                            <p className='card-text text-white mb-0'>{card.title}</p>
-                            <div className='d-flex gap-1'>
+                            <p className="card-text mb-0">{card.title}</p>
+                            <div className="d-flex gap-1">
                                 <button
-                                    className='btn btn-sm btn-outline-light'
+                                    className="btn btn-sm btn-outline-primary"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setEditingCard(card.id);
@@ -725,7 +667,7 @@ function Board({ userId }) {
                                 >
                                     Edit
                                 </button>
-                                <button className='btn btn-sm btn-outline-danger' onClick={() => handleDeleteCard(card.id)}>
+                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteCard(card.id)}>
                                     Delete
                                 </button>
                             </div>
@@ -737,73 +679,71 @@ function Board({ userId }) {
     };
 
     if (!userId || !boardId) {
-        console.log("userId or boardId is not available in Board component");
-        return <div className="text-white">User ID or Board ID is not available. Please select a board.</div>;
+        return <div className="text-center text-secondary mt-5">User ID or Board ID is not available. Please select a board.</div>;
     }
 
     if (isLoadingBoard || isLoading) {
-        console.log("Board is loading...");
-        return <div className="text-white">Loading...</div>;
+        return <div className="text-center text-secondary mt-5">Loading...</div>;
     }
 
     if (error) {
-        console.log("Error in Board:", error);
-        return <div className="text-white">Error loading cards: {error}</div>;
+        return <div className="text-center text-danger mt-5">Error loading cards: {error}</div>;
     }
 
-    console.log("Rendering Board with cards:", cards);
     return (
-        <div className='d-flex p-4' style={{ backgroundColor: '#1a2a44', minHeight: '100vh' }}>
-            <div className='container-fluid'>
-                <div className='d-flex justify-content-between align-items-center mb-4'>
+        <div className="p-4">
+            <div className="container-fluid">
+                <div className="d-flex justify-content-between align-items-center mb-4">
                     {renamingBoard ? (
-                        <div className='d-flex gap-2'>
+                        <div className="d-flex gap-2">
                             <input
-                                type='text'
-                                className='form-control'
+                                type="text"
+                                className="form-control"
                                 value={newBoardName}
                                 onChange={(e) => setNewBoardName(e.target.value)}
-                                placeholder='Enter board name'
-                                style={{ backgroundColor: '#2c3e50', color: 'white', border: 'none' }}
+                                placeholder="Enter board name"
                             />
-                            <button className='btn btn-success btn-sm' onClick={handleRenameBoard}>
+                            <button className="btn btn-success btn-sm" onClick={handleRenameBoard}>
                                 Save
                             </button>
-                            <button className='btn btn-secondary btn-sm' onClick={() => setRenamingBoard(false)}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setRenamingBoard(false)}>
                                 Cancel
                             </button>
                         </div>
                     ) : (
-                        <h2 className='text-white' onClick={() => { setRenamingBoard(true); setNewBoardName(boardName); }}>
+                        <h2
+                            className="fade-in"
+                            onClick={() => { setRenamingBoard(true); setNewBoardName(boardName); }}
+                            style={{ cursor: 'pointer', fontWeight: 600 }}
+                        >
                             {boardName}
                         </h2>
                     )}
                     <div>
                         {!showListInput ? (
-                            <button className='btn btn-primary' onClick={() => setShowListInput(true)}>
+                            <button className="btn btn-primary" onClick={() => setShowListInput(true)}>
                                 Add New List
                             </button>
                         ) : (
-                            <div className='d-flex gap-2'>
+                            <div className="d-flex gap-2">
                                 <input
-                                    type='text'
-                                    className='form-control'
-                                    placeholder='Enter list name'
+                                    type="text"
+                                    className="form-control"
+                                    placeholder="Enter list name"
                                     value={newListName}
                                     onChange={(e) => setNewListName(e.target.value)}
-                                    style={{ backgroundColor: '#2c3e50', color: 'white', border: 'none' }}
                                 />
-                                <button className='btn btn-success btn-sm' onClick={handleAddList}>
+                                <button className="btn btn-success btn-sm" onClick={handleAddList}>
                                     Add
                                 </button>
-                                <button className='btn btn-secondary btn-sm' onClick={() => setShowListInput(false)}>
+                                <button className="btn btn-secondary btn-sm" onClick={() => setShowListInput(false)}>
                                     Cancel
                                 </button>
                             </div>
                         )}
                     </div>
                 </div>
-                <div className='d-flex gap-3' style={{ overflowX: 'auto' }}>
+                <div className="d-flex gap-3" style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
                     {lists.map((column) => (
                         <SimpleList key={column} column={column} />
                     ))}
