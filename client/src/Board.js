@@ -12,8 +12,9 @@ function Board({ userId }) {
 
     const [newCardTitle, setNewCardTitle] = useState('');
     const [showInput, setShowInput] = useState({});
-    const [lists, setLists] = useState(['Tasks', 'In Progress', 'Done']);
+    const [lists, setLists] = useState([]); // Initialize as empty; will fetch from backend
     const [listColors, setListColors] = useState({});
+    const [listIds, setListIds] = useState({}); // Store list IDs from the backend
     const [newListName, setNewListName] = useState('');
     const [showListInput, setShowListInput] = useState(false);
     const [renamingList, setRenamingList] = useState(null);
@@ -21,11 +22,35 @@ function Board({ userId }) {
     const [editingCard, setEditingCard] = useState(null);
     const [editCardTitle, setEditCardTitle] = useState('');
     const [showColorPicker, setShowColorPicker] = useState(null);
+    const [boardName, setBoardName] = useState('Board'); // Initialize as default; will fetch from backend
+    const [renamingBoard, setRenamingBoard] = useState(false);
+    const [newBoardName, setNewBoardName] = useState('');
 
-    // Fetch cards when userId changes
+    // Fetch board name, lists, and cards when userId changes
     useEffect(() => {
         if (userId) {
-            // Reset the cards in the Redux store before fetching
+            // Fetch board and lists
+            axios.get(`http://localhost:5000/boards/${userId}`)
+                .then(res => {
+                    console.log("Fetched board and lists:", res.data);
+                    setBoardName(res.data.boardName);
+                    const fetchedLists = res.data.lists.map(list => list.name);
+                    const fetchedColors = {};
+                    const fetchedIds = {};
+                    res.data.lists.forEach(list => {
+                        fetchedColors[list.name] = list.color;
+                        fetchedIds[list.name] = list.id;
+                    });
+                    setLists(fetchedLists);
+                    setListColors(fetchedColors);
+                    setListIds(fetchedIds);
+                })
+                .catch(err => {
+                    console.error("Error fetching board and lists:", err);
+                    alert('Error fetching board and lists');
+                });
+
+            // Fetch cards
             dispatch(setCards([]));
             dispatch(fetchCards(userId));
         }
@@ -79,32 +104,65 @@ function Board({ userId }) {
             alert('List name already exists');
             return;
         }
-        setLists([...lists, newListName.trim()]);
-        setListColors(prev => ({ ...prev, [newListName.trim()]: '#2c3e50' }));
-        setNewListName('');
-        setShowListInput(false);
+        const newList = { userId, name: newListName.trim(), color: '#2c3e50' };
+        axios.post('http://localhost:5000/lists', newList)
+            .then(res => {
+                console.log("Add list response:", res.data);
+                if (res.data.message === 'List added') {
+                    const newListNameTrimmed = newListName.trim();
+                    setLists([...lists, newListNameTrimmed]);
+                    setListColors(prev => ({ ...prev, [newListNameTrimmed]: '#2c3e50' }));
+                    setListIds(prev => ({ ...prev, [newListNameTrimmed]: res.data.listId }));
+                    setNewListName('');
+                    setShowListInput(false);
+                } else {
+                    alert('Failed to add list');
+                }
+            })
+            .catch(err => {
+                console.error("Error adding list:", err);
+                alert('Error adding list');
+            });
     };
 
     const handleDeleteList = (listName) => {
         if (window.confirm(`Are you sure you want to delete the list "${listName}"? All cards in this list will be moved to "Tasks".`)) {
-            const updatedCards = cards.map(card => {
-                if ((card.column_name || '').trim() === listName) {
-                    return { ...card, column_name: 'Tasks' };
-                }
-                return card;
-            });
-            dispatch(setCards(updatedCards));
-            axios.put('http://localhost:5000/cards/move', { userId, fromList: listName, toList: 'Tasks' })
+            const listId = listIds[listName];
+            axios.delete(`http://localhost:5000/lists/${listId}`)
                 .then(res => {
-                    console.log("Cards moved:", res.data);
+                    console.log("Delete list response:", res.data);
+                    if (res.data.message === 'List deleted') {
+                        const updatedCards = cards.map(card => {
+                            if ((card.column_name || '').trim() === listName) {
+                                return { ...card, column_name: 'Tasks' };
+                            }
+                            return card;
+                        });
+                        dispatch(setCards(updatedCards));
+                        axios.put('http://localhost:5000/cards/move', { userId, fromList: listName, toList: 'Tasks' })
+                            .then(res => {
+                                console.log("Cards moved:", res.data);
+                            })
+                            .catch(err => console.error("Error moving cards:", err));
+                        setLists(lists.filter(list => list !== listName));
+                        setListColors(prev => {
+                            const newColors = { ...prev };
+                            delete newColors[listName];
+                            return newColors;
+                        });
+                        setListIds(prev => {
+                            const newIds = { ...prev };
+                            delete newIds[listName];
+                            return newIds;
+                        });
+                    } else {
+                        alert('Failed to delete list');
+                    }
                 })
-                .catch(err => console.error("Error moving cards:", err));
-            setLists(lists.filter(list => list !== listName));
-            setListColors(prev => {
-                const newColors = { ...prev };
-                delete newColors[listName];
-                return newColors;
-            });
+                .catch(err => {
+                    console.error("Error deleting list:", err);
+                    alert('Error deleting list');
+                });
         }
     };
 
@@ -117,28 +175,47 @@ function Board({ userId }) {
             alert('List name already exists');
             return;
         }
-        const updatedLists = lists.map(list => (list === oldName ? renameValue.trim() : list));
-        setLists(updatedLists);
-        const updatedCards = cards.map(card => {
-            if ((card.column_name || '').trim() === oldName) {
-                return { ...card, column_name: renameValue.trim() };
-            }
-            return card;
-        });
-        dispatch(setCards(updatedCards));
-        axios.put('http://localhost:5000/cards/rename', { userId, oldName, newName: renameValue.trim() })
+        const listId = listIds[oldName];
+        axios.put(`http://localhost:5000/lists/${listId}`, { name: renameValue.trim() })
             .then(res => {
-                console.log("Cards renamed:", res.data);
+                console.log("Rename list response:", res.data);
+                if (res.data.message === 'List renamed') {
+                    const updatedLists = lists.map(list => (list === oldName ? renameValue.trim() : list));
+                    setLists(updatedLists);
+                    const updatedCards = cards.map(card => {
+                        if ((card.column_name || '').trim() === oldName) {
+                            return { ...card, column_name: renameValue.trim() };
+                        }
+                        return card;
+                    });
+                    dispatch(setCards(updatedCards));
+                    axios.put('http://localhost:5000/cards/rename', { userId, oldName, newName: renameValue.trim() })
+                        .then(res => {
+                            console.log("Cards renamed:", res.data);
+                        })
+                        .catch(err => console.error("Error renaming cards:", err));
+                    setListColors(prev => {
+                        const newColors = { ...prev };
+                        newColors[renameValue.trim()] = newColors[oldName];
+                        delete newColors[oldName];
+                        return newColors;
+                    });
+                    setListIds(prev => {
+                        const newIds = { ...prev };
+                        newIds[renameValue.trim()] = newIds[oldName];
+                        delete newIds[oldName];
+                        return newIds;
+                    });
+                    setRenamingList(null);
+                    setRenameValue('');
+                } else {
+                    alert('Failed to rename list');
+                }
             })
-            .catch(err => console.error("Error renaming cards:", err));
-        setListColors(prev => {
-            const newColors = { ...prev };
-            newColors[renameValue.trim()] = newColors[oldName];
-            delete newColors[oldName];
-            return newColors;
-        });
-        setRenamingList(null);
-        setRenameValue('');
+            .catch(err => {
+                console.error("Error renaming list:", err);
+                alert('Error renaming list');
+            });
     };
 
     const handleEditCard = (card) => {
@@ -188,30 +265,44 @@ function Board({ userId }) {
             alert('A list with this name already exists');
             return;
         }
-        setLists([...lists, newListName]);
-        setListColors(prev => ({ ...prev, [newListName]: listColors[listName] || '#2c3e50' }));
-        const cardsToCopy = cards.filter(card => (card.column_name || '').trim() === listName);
-        const newCards = cardsToCopy.map(card => ({
-            userId,
-            title: card.title,
-            color: card.color,
-            column_name: newListName,
-        }));
-        Promise.all(
-            newCards.map(card =>
-                axios.post('http://localhost:5000/cards', card)
-                    .then(res => ({
-                        id: res.data.cardId,
+        const newList = { userId, name: newListName, color: listColors[listName] || '#2c3e50' };
+        axios.post('http://localhost:5000/lists', newList)
+            .then(res => {
+                console.log("Copy list response:", res.data);
+                if (res.data.message === 'List added') {
+                    setLists([...lists, newListName]);
+                    setListColors(prev => ({ ...prev, [newListName]: listColors[listName] || '#2c3e50' }));
+                    setListIds(prev => ({ ...prev, [newListName]: res.data.listId }));
+                    const cardsToCopy = cards.filter(card => (card.column_name || '').trim() === listName);
+                    const newCards = cardsToCopy.map(card => ({
+                        userId,
                         title: card.title,
                         color: card.color,
                         column_name: newListName,
-                    }))
-            )
-        )
-            .then(newCards => {
-                dispatch(setCards([...cards, ...newCards]));
+                    }));
+                    Promise.all(
+                        newCards.map(card =>
+                            axios.post('http://localhost:5000/cards', card)
+                                .then(res => ({
+                                    id: res.data.cardId,
+                                    title: card.title,
+                                    color: card.color,
+                                    column_name: newListName,
+                                }))
+                        )
+                    )
+                        .then(newCards => {
+                            dispatch(setCards([...cards, ...newCards]));
+                        })
+                        .catch(err => console.error("Error copying list:", err));
+                } else {
+                    alert('Failed to copy list');
+                }
             })
-            .catch(err => console.error("Error copying list:", err));
+            .catch(err => {
+                console.error("Error copying list:", err);
+                alert('Error copying list');
+            });
     };
 
     const handleMoveList = (listName) => {
@@ -253,6 +344,30 @@ function Board({ userId }) {
     const handleChangeListColor = (listName, color) => {
         setListColors(prev => ({ ...prev, [listName]: color.hex }));
         setShowColorPicker(null);
+        // Optionally, you can add an API call to save the color to the backend
+        // For simplicity, we're keeping it in state, but you can extend this
+    };
+
+    const handleRenameBoard = () => {
+        if (newBoardName.trim() === '') {
+            alert('Please enter a board name');
+            return;
+        }
+        axios.put(`http://localhost:5000/boards/${userId}`, { name: newBoardName.trim() })
+            .then(res => {
+                console.log("Rename board response:", res.data);
+                if (res.data.message === 'Board name updated') {
+                    setBoardName(newBoardName.trim());
+                    setRenamingBoard(false);
+                    setNewBoardName('');
+                } else {
+                    alert('Failed to rename board');
+                }
+            })
+            .catch(err => {
+                console.error("Error renaming board:", err);
+                alert('Error renaming board');
+            });
     };
 
     const SimpleList = ({ column }) => {
@@ -595,7 +710,28 @@ function Board({ userId }) {
         <div className='d-flex p-4' style={{ backgroundColor: '#1a2a44', minHeight: '100vh' }}>
             <div className='container-fluid'>
                 <div className='d-flex justify-content-between align-items-center mb-4'>
-                    <h2 className='text-white'>Board</h2>
+                    {renamingBoard ? (
+                        <div className='d-flex gap-2'>
+                            <input
+                                type='text'
+                                className='form-control'
+                                value={newBoardName}
+                                onChange={(e) => setNewBoardName(e.target.value)}
+                                placeholder='Enter board name'
+                                style={{ backgroundColor: '#2c3e50', color: 'white', border: 'none' }}
+                            />
+                            <button className='btn btn-success btn-sm' onClick={handleRenameBoard}>
+                                Save
+                            </button>
+                            <button className='btn btn-secondary btn-sm' onClick={() => setRenamingBoard(false)}>
+                                Cancel
+                            </button>
+                        </div>
+                    ) : (
+                        <h2 className='text-white' onClick={() => { setRenamingBoard(true); setNewBoardName(boardName); }}>
+                            {boardName}
+                        </h2>
+                    )}
                     <div>
                         {!showListInput ? (
                             <button className='btn btn-primary' onClick={() => setShowListInput(true)}>
