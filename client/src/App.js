@@ -11,11 +11,24 @@ function App() {
     const [userId, setUserId] = useState(() => {
         return localStorage.getItem('userId') || null;
     });
+<<<<<<< Updated upstream
+=======
+    const [selectedBoardId, setSelectedBoardId] = useState(null);
+    const [isDarkTheme, setIsDarkTheme] = useState(() => {
+        return localStorage.getItem('theme') === 'dark';
+    });
+>>>>>>> Stashed changes
 
     useEffect(() => {
         localStorage.setItem('isLoggedIn', isLoggedIn);
         localStorage.setItem('userId', userId);
-    }, [isLoggedIn, userId]);
+        localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
+        if (isDarkTheme) {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
+    }, [isLoggedIn, userId, isDarkTheme]);
 
     const handleLogout = () => {
         setIsLoggedIn(false);
@@ -24,12 +37,17 @@ function App() {
         localStorage.removeItem('userId');
     };
 
+    const toggleTheme = () => {
+        setIsDarkTheme(prev => !prev);
+    };
+
     return (
         <Router>
             <div>
                 <nav className="navbar navbar-expand-lg navbar-light bg-light">
                     <div className="container-fluid">
                         <Link className="navbar-brand" to="/">To-Do App</Link>
+<<<<<<< Updated upstream
                         <div className="navbar-nav">
                             {!isLoggedIn ? (
                                 <>
@@ -47,6 +65,50 @@ function App() {
                                     </button>
                                 </>
                             )}
+=======
+                        <button
+                            className="navbar-toggler"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#navbarNav"
+                            aria-controls="navbarNav"
+                            aria-expanded="false"
+                            aria-label="Toggle navigation"
+                        >
+                            <span className="navbar-toggler-icon"></span>
+                        </button>
+                        <div className="collapse navbar-collapse" id="navbarNav">
+                            <div className="navbar-nav ms-auto">
+                                <button
+                                    className="nav-link theme-toggle-btn"
+                                    onClick={toggleTheme}
+                                    title={isDarkTheme ? "Switch to Light Theme" : "Switch to Dark Theme"}
+                                >
+                                    {isDarkTheme ? <i className="bi bi-sun-fill"></i> : <i className="bi bi-moon-fill"></i>}
+                                </button>
+                                {!isLoggedIn ? (
+                                    <>
+                                        <Link className="nav-link" to="/login">Login</Link>
+                                        <Link className="nav-link" to="/signup">Sign Up</Link>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link className="nav-link" to="/board-selector">Boards</Link>
+                                        {selectedBoardId && (
+                                            <Link className="nav-link" to={`/board/${selectedBoardId}`}>
+                                                Current Board
+                                            </Link>
+                                        )}
+                                        <button
+                                            className="nav-link btn btn-link"
+                                            onClick={handleLogout}
+                                        >
+                                            Logout
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+>>>>>>> Stashed changes
                         </div>
                     </div>
                 </nav>
