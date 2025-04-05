@@ -1,8 +1,7 @@
-// src/store.js
+// store.js
 import { configureStore, createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
 
-// Define the cards slice
 const cardsSlice = createSlice({
     name: 'cards',
     initialState: {
@@ -50,7 +49,6 @@ const cardsSlice = createSlice({
     },
 });
 
-// Export actions
 export const {
     fetchCardsStart,
     fetchCardsSuccess,
@@ -62,16 +60,16 @@ export const {
 } = cardsSlice.actions;
 
 // Thunk to fetch cards
-export const fetchCards = (userId) => async (dispatch) => {
-    if (!userId) {
-        console.log("fetchCards: userId is undefined");
-        dispatch(fetchCardsFailure("userId is undefined"));
+export const fetchCards = ({ userId, boardId }) => async (dispatch) => {
+    if (!userId || !boardId) {
+        console.log("fetchCards: userId or boardId is undefined");
+        dispatch(fetchCardsFailure("userId or boardId is undefined"));
         return;
     }
 
     dispatch(fetchCardsStart());
     try {
-        const res = await axios.get(`http://localhost:5000/cards/${userId}`);
+        const res = await axios.get(`http://localhost:5000/cards/${userId}/board/${boardId}`);
         console.log("fetchCards: Server response:", res.data);
         if (res.data === "Error") {
             console.error("fetchCards: Server returned an error while fetching cards");
@@ -89,7 +87,6 @@ export const fetchCards = (userId) => async (dispatch) => {
     }
 };
 
-// Configure the store
 const store = configureStore({
     reducer: {
         cards: cardsSlice.reducer,

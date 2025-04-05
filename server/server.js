@@ -55,102 +55,140 @@ app.post('/signup', (req, res) => {
                 console.error("Error inserting user:", err);
                 return res.status(500).json("Error");
             }
-            return res.status(201).json("Signup Successful");
+            // Create a default board for the new user
+            const userId = data.insertId;
+            const insertBoardSql = "INSERT INTO boards (userId, name) VALUES (?, ?)";
+            db.query(insertBoardSql, [userId, 'My Board'], (err) => {
+                if (err) {
+                    console.error("Error creating default board:", err);
+                    return res.status(500).json("Error");
+                }
+                return res.status(201).json("Signup Successful");
+            });
         });
     });
 });
 
-// Fetch board and lists for a user
-app.get('/boards/:userId', (req, res) => {
+// Fetch all boards for a user
+app.get('/boards/user/:userId', (req, res) => {
     const userId = parseInt(req.params.userId);
-    // Fetch the board
-    const boardSql = "SELECT name FROM boards WHERE userId = ?";
-    db.query(boardSql, [userId], (err, boardData) => {
+    const sql = "SELECT id, name FROM boards WHERE userId = ?";
+    db.query(sql, [userId], (err, data) => {
+        if (err) {
+            console.error("Error fetching boards:", err);
+            return res.status(500).json("Error");
+        }
+        return res.json(data);
+    });
+});
+
+// Create a new board
+app.post('/boards', (req, res) => {
+    const { userId, name } = req.body;
+    if (!name || name.trim() === '') {
+        return res.status(400).json("Board name cannot be empty");
+    }
+    const sql = "INSERT INTO boards (userId, name) VALUES (?, ?)";
+    db.query(sql, [userId, name.trim()], (err, data) => {
+        if (err) {
+            console.error("Error creating board:", err);
+            return res.status(500).json("Error");
+        }
+        const boardId = data.insertId;
+        // Create default lists for the new board
+        const defaultLists = [
+            { name: 'Tasks', color: '#2c3e50' },
+            { name: 'In Progress', color: '#2c3e50' },
+            { name: 'Done', color: '#2c3e50' },
+        ];
+        const insertListSql = "INSERT INTO lists (board_id, name, color) VALUES (?, ?, ?)";
+        const values = defaultLists.map(list => [boardId, list.name, list.color]).flat();
+        db.query(
+            "INSERT INTO lists (board_id, name, color) VALUES " +
+            defaultLists.map(() => "(?, ?, ?)").join(","),
+            values,
+            (err) => {
+                if (err) {
+                    console.error("Error creating default lists:", err);
+                    return res.status(500).json("Error");
+                }
+                return res.status(201).json({ message: "Board created", boardId });
+            }
+        );
+    });
+});
+
+// Delete a board
+app.delete('/boards/:boardId', (req, res) => {
+    const boardId = parseInt(req.params.boardId);
+    const sql = "DELETE FROM boards WHERE id = ?";
+    db.query(sql, [boardId], (err, result) => {
+        if (err) {
+            console.error("Error deleting board:", err);
+            return res.status(500).json("Error");
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json("Board Not Found");
+        }
+        return res.json({ message: "Board deleted" });
+    });
+});
+
+// Fetch board details (lists) for a specific board
+app.get('/boards/:boardId', (req, res) => {
+    const boardId = parseInt(req.params.boardId);
+    const boardSql = "SELECT name FROM boards WHERE id = ?";
+    db.query(boardSql, [boardId], (err, boardData) => {
         if (err) {
             console.error("Error fetching board:", err);
             return res.status(500).json("Error");
         }
-
-        let boardName = 'My Board'; // Default board name
         if (boardData.length === 0) {
-            // If no board exists, create one
-            const insertBoardSql = "INSERT INTO boards (userId, name) VALUES (?, ?)";
-            db.query(insertBoardSql, [userId, boardName], (err) => {
-                if (err) {
-                    console.error("Error creating board:", err);
-                    return res.status(500).json("Error");
-                }
-                // After creating the board, create default lists
-                createDefaultLists(userId, res, boardName);
-            });
-        } else {
-            boardName = boardData[0].name;
-            // Fetch lists
-            fetchLists(userId, res, boardName);
+            return res.status(404).json("Board Not Found");
         }
+        const boardName = boardData[0].name;
+        const listSql = "SELECT id, name, color FROM lists WHERE board_id = ?";
+        db.query(listSql, [boardId], (err, listData) => {
+            if (err) {
+                console.error("Error fetching lists:", err);
+                return res.status(500).json("Error");
+            }
+            return res.json({ boardName, lists: listData });
+        });
     });
 });
 
-// Helper function to create default lists
-const createDefaultLists = (userId, res, boardName) => {
-    const defaultLists = [
-        { name: 'Tasks', color: '#2c3e50' },
-        { name: 'In Progress', color: '#2c3e50' },
-        { name: 'Done', color: '#2c3e50' },
-    ];
-
-    const insertListSql = "INSERT INTO lists (user_id, name, color) VALUES (?, ?, ?)";
-    const values = defaultLists.map(list => [userId, list.name, list.color]).flat();
-
-    // Use a transaction to insert all default lists
-    db.query(
-        "INSERT INTO lists (user_id, name, color) VALUES " +
-        defaultLists.map(() => "(?, ?, ?)").join(","),
-        values,
-        (err, result) => {
-            if (err) {
-                console.error("Error creating default lists:", err);
-                return res.status(500).json("Error");
-            }
-            fetchLists(userId, res, boardName);
-        }
-    );
-};
-
-// Helper function to fetch lists
-const fetchLists = (userId, res, boardName) => {
-    const listSql = "SELECT id, name, color FROM lists WHERE user_id = ?";
-    db.query(listSql, [userId], (err, listData) => {
-        if (err) {
-            console.error("Error fetching lists:", err);
-            return res.status(500).json("Error");
-        }
-        return res.json({ boardName, lists: listData });
-    });
-};
-
 // Update board name
-app.put('/boards/:userId', (req, res) => {
-    const userId = parseInt(req.params.userId);
+app.put('/boards/:boardId', (req, res) => {
+    const boardId = parseInt(req.params.boardId);
     const { name } = req.body;
     if (!name || name.trim() === '') {
         return res.status(400).json("Board name cannot be empty");
     }
-    const sql = "INSERT INTO boards (userId, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?";
-    db.query(sql, [userId, name.trim(), name.trim()], (err) => {
+    const sql = "UPDATE boards SET name = ? WHERE id = ?";
+    db.query(sql, [name.trim(), boardId], (err, result) => {
         if (err) {
             console.error("Error updating board name:", err);
             return res.status(500).json("Error");
+        }
+        if (result.affectedRows === 0) {
+            return res.status(404).json("Board Not Found");
         }
         return res.json({ message: "Board name updated" });
     });
 });
 
-// Fetch cards for a user
-app.get('/cards/:userId', (req, res) => {
-    const userId = req.params.userId;
-    const sql = "SELECT * FROM cards WHERE user_id = ?";
-    db.query(sql, [userId], (err, data) => {
+// Fetch cards for a user (filtered by board)
+app.get('/cards/:userId/board/:boardId', (req, res) => {
+    const userId = parseInt(req.params.userId);
+    const boardId = parseInt(req.params.boardId);
+    const sql = `
+        SELECT c.*
+        FROM cards c
+        JOIN lists l ON c.column_name = l.name
+        WHERE c.user_id = ? AND l.board_id = ?
+    `;
+    db.query(sql, [userId, boardId], (err, data) => {
         if (err) {
             console.error("Error fetching cards:", err);
             return res.status(500).json("Error");
@@ -175,11 +213,45 @@ app.post('/cards', (req, res) => {
     });
 });
 
+// Move cards to another list
+app.put('/cards/move', (req, res) => {
+    const { userId, fromList, toList } = req.body;
+    const sql = "UPDATE cards SET column_name = ? WHERE user_id = ? AND column_name = ?";
+    db.query(sql, [toList, userId, fromList], (err) => {
+        if (err) {
+            console.error("Error moving cards:", err);
+            return res.status(500).json("Error");
+        }
+        return res.json("Cards Moved");
+    });
+});
+
+// Rename a list (update column_name for all cards in that list)
+app.put('/cards/rename', (req, res) => {
+    const { userId, oldName, newName } = req.body;
+    console.log("Received /cards/rename request with body:", req.body);
+    if (!userId || !oldName || !newName) {
+        console.error("Missing required fields in /cards/rename request");
+        return res.status(400).json("Missing required fields: userId, oldName, and newName are required");
+    }
+    const sql = "UPDATE cards SET column_name = ? WHERE user_id = ? AND column_name = ?";
+    db.query(sql, [newName, userId, oldName], (err) => {
+        if (err) {
+            console.error("Error renaming cards:", err);
+            return res.status(500).json("Error");
+        }
+        console.log(`Updated cards: set column_name to ${newName} for userId ${userId} where column_name was ${oldName}`);
+        return res.json("Cards Renamed");
+    });
+});
+
 // Update a card
 app.put('/cards/:id', (req, res) => {
     const cardId = req.params.id;
     const { title } = req.body;
+    console.log(`Received /cards/${cardId} request with body:`, req.body);
     if (!title || title.trim() === '') {
+        console.error(`Validation failed for /cards/${cardId}: Card title cannot be empty`);
         return res.status(400).json("Card title cannot be empty");
     }
     const sql = "UPDATE cards SET title = ? WHERE id = ?";
@@ -188,6 +260,7 @@ app.put('/cards/:id', (req, res) => {
             console.error("Error updating card:", err);
             return res.status(500).json("Error");
         }
+        console.log(`Updated card with id ${cardId}`);
         return res.json("Card Updated");
     });
 });
@@ -208,47 +281,21 @@ app.delete('/cards/:id', (req, res) => {
     });
 });
 
-// Move cards to another list
-app.put('/cards/move', (req, res) => {
-    const { userId, fromList, toList } = req.body;
-    const sql = "UPDATE cards SET column_name = ? WHERE user_id = ? AND column_name = ?";
-    db.query(sql, [toList, userId, fromList], (err) => {
-        if (err) {
-            console.error("Error moving cards:", err);
-            return res.status(500).json("Error");
-        }
-        return res.json("Cards Moved");
-    });
-});
-
-// Rename a list (update column_name for all cards in that list)
-app.put('/cards/rename', (req, res) => {
-    const { userId, oldName, newName } = req.body;
-    const sql = "UPDATE cards SET column_name = ? WHERE user_id = ? AND column_name = ?";
-    db.query(sql, [newName, userId, oldName], (err) => {
-        if (err) {
-            console.error("Error renaming cards:", err);
-            return res.status(500).json("Error");
-        }
-        return res.json("Cards Renamed");
-    });
-});
-
 // Add a new list
 app.post('/lists', (req, res) => {
-    const { userId, name, color } = req.body;
+    const { boardId, name, color } = req.body;
     if (!name || name.trim() === '') {
         return res.status(400).json("List name cannot be empty");
     }
     if (!color || color.trim() === '') {
         return res.status(400).json("List color cannot be empty");
     }
-    const sql = "INSERT INTO lists (user_id, name, color) VALUES (?, ?, ?)";
-    db.query(sql, [userId, name.trim(), color], (err, data) => {
+    const sql = "INSERT INTO lists (board_id, name, color) VALUES (?, ?, ?)";
+    db.query(sql, [boardId, name.trim(), color], (err, data) => {
         if (err) {
             console.error("Error adding list:", err);
             if (err.code === 'ER_DUP_ENTRY') {
-                return res.status(400).json("List name already exists for this user");
+                return res.status(400).json("List name already exists for this board");
             }
             return res.status(500).json("Error");
         }
@@ -284,7 +331,7 @@ app.put('/lists/:id', (req, res) => {
         if (err) {
             console.error("Error renaming list:", err);
             if (err.code === 'ER_DUP_ENTRY') {
-                return res.status(400).json("List name already exists for this user");
+                return res.status(400).json("List name already exists for this board");
             }
             return res.status(500).json("Error");
         }

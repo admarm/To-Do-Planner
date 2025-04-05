@@ -1,12 +1,15 @@
+// Board.js
 import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { SketchPicker } from 'react-color';
 import { useSelector, useDispatch } from 'react-redux';
 import { fetchCards, addCard, updateCard, deleteCard, setCards } from './store';
+import { useParams } from 'react-router-dom';
 
 function Board({ userId }) {
-    console.log("Board component rendered with userId:", userId);
+    const { boardId } = useParams(); // Get boardId from URL
+    console.log("Board component rendered with userId:", userId, "boardId:", boardId);
     const dispatch = useDispatch();
     const { cards = [], isLoading, error } = useSelector((state) => state.cards);
 
@@ -27,11 +30,11 @@ function Board({ userId }) {
     const [newBoardName, setNewBoardName] = useState('');
     const [isLoadingBoard, setIsLoadingBoard] = useState(true);
 
-    // Fetch board name, lists, and cards when userId changes
+    // Fetch board name, lists, and cards when boardId changes
     useEffect(() => {
-        if (userId) {
+        if (userId && boardId) {
             setIsLoadingBoard(true);
-            axios.get(`http://localhost:5000/boards/${userId}`)
+            axios.get(`http://localhost:5000/boards/${boardId}`)
                 .then(res => {
                     console.log("Fetched board and lists:", res.data);
                     setBoardName(res.data.boardName);
@@ -53,9 +56,9 @@ function Board({ userId }) {
                 .finally(() => setIsLoadingBoard(false));
 
             dispatch(setCards([]));
-            dispatch(fetchCards(userId));
+            dispatch(fetchCards({ userId, boardId }));
         }
-    }, [userId, dispatch]);
+    }, [userId, boardId, dispatch]);
 
     const handleAddCard = (columnName) => {
         if (newCardTitle.trim() === '') {
@@ -86,13 +89,13 @@ function Board({ userId }) {
                 } else {
                     console.error('Unexpected response:', res.data);
                     alert('Failed to add card');
-                    dispatch(fetchCards(userId));
+                    dispatch(fetchCards({ userId, boardId }));
                 }
             })
             .catch(err => {
                 console.error('Error adding card:', err);
                 alert('Error adding card');
-                dispatch(fetchCards(userId));
+                dispatch(fetchCards({ userId, boardId }));
             });
     };
 
@@ -105,7 +108,7 @@ function Board({ userId }) {
             alert('List name already exists');
             return;
         }
-        const newList = { userId, name: newListName.trim(), color: '#2c3e50' };
+        const newList = { boardId, name: newListName.trim(), color: '#2c3e50' };
         axios.post('http://localhost:5000/lists', newList)
             .then(res => {
                 console.log("Add list response:", res.data);
@@ -181,34 +184,67 @@ function Board({ userId }) {
             .then(res => {
                 console.log("Rename list response:", res.data);
                 if (res.data.message === 'List renamed') {
+                    // First, update the list name in the frontend state
                     const updatedLists = lists.map(list => (list === oldName ? renameValue.trim() : list));
                     setLists(updatedLists);
-                    const updatedCards = cards.map(card => {
-                        if ((card.column_name || '').trim() === oldName) {
-                            return { ...card, column_name: renameValue.trim() };
-                        }
-                        return card;
-                    });
-                    dispatch(setCards(updatedCards));
+    
+                    // Then, update the cards' column_name in the backend
                     axios.put('http://localhost:5000/cards/rename', { userId, oldName, newName: renameValue.trim() })
                         .then(res => {
                             console.log("Cards renamed:", res.data);
+                            if (res.data === "Cards Renamed") {
+                                // Update the cards in the frontend state
+                                const updatedCards = cards.map(card => {
+                                    if ((card.column_name || '').trim() === oldName) {
+                                        return { ...card, column_name: renameValue.trim() };
+                                    }
+                                    return card;
+                                });
+                                dispatch(setCards(updatedCards));
+    
+                                // Update listColors and listIds
+                                setListColors(prev => {
+                                    const newColors = { ...prev };
+                                    newColors[renameValue.trim()] = newColors[oldName];
+                                    delete newColors[oldName];
+                                    return newColors;
+                                });
+                                setListIds(prev => {
+                                    const newIds = { ...prev };
+                                    newIds[renameValue.trim()] = newIds[oldName];
+                                    delete newIds[oldName];
+                                    return newIds;
+                                });
+    
+                                // Reset the renaming state
+                                setRenamingList(null);
+                                setRenameValue('');
+                            } else {
+                                // If the cards rename fails, revert the list rename
+                                alert('Failed to update cards. Reverting list name change.');
+                                axios.put(`http://localhost:5000/lists/${listId}`, { name: oldName })
+                                    .then(() => {
+                                        setLists(lists); // Revert the lists state
+                                    })
+                                    .catch(err => {
+                                        console.error("Error reverting list name:", err);
+                                        alert('Error reverting list name. Please refresh the page.');
+                                    });
+                            }
                         })
-                        .catch(err => console.error("Error renaming cards:", err));
-                    setListColors(prev => {
-                        const newColors = { ...prev };
-                        newColors[renameValue.trim()] = newColors[oldName];
-                        delete newColors[oldName];
-                        return newColors;
-                    });
-                    setListIds(prev => {
-                        const newIds = { ...prev };
-                        newIds[renameValue.trim()] = newIds[oldName];
-                        delete newIds[oldName];
-                        return newIds;
-                    });
-                    setRenamingList(null);
-                    setRenameValue('');
+                        .catch(err => {
+                            console.error("Error renaming cards:", err);
+                            alert(err.response?.data || 'Error renaming cards. Reverting list name change.');
+                            // Revert the list rename
+                            axios.put(`http://localhost:5000/lists/${listId}`, { name: oldName })
+                                .then(() => {
+                                    setLists(lists); // Revert the lists state
+                                })
+                                .catch(err => {
+                                    console.error("Error reverting list name:", err);
+                                    alert('Error reverting list name. Please refresh the page.');
+                                });
+                        });
                 } else {
                     alert('Failed to rename list');
                 }
@@ -244,7 +280,7 @@ function Board({ userId }) {
                     } else {
                         console.error("Unexpected response:", res.data);
                         alert('Failed to delete card');
-                        dispatch(fetchCards(userId));
+                        dispatch(fetchCards({ userId, boardId }));
                     }
                 })
                 .catch(err => {
@@ -254,7 +290,7 @@ function Board({ userId }) {
                         dispatch(deleteCard(cardId));
                     } else {
                         alert('Error deleting card');
-                        dispatch(fetchCards(userId));
+                        dispatch(fetchCards({ userId, boardId }));
                     }
                 });
         }
@@ -266,7 +302,7 @@ function Board({ userId }) {
             alert('A list with this name already exists');
             return;
         }
-        const newList = { userId, name: newListName, color: listColors[listName] || '#2c3e50' };
+        const newList = { boardId, name: newListName, color: listColors[listName] || '#2c3e50' };
         axios.post('http://localhost:5000/lists', newList)
             .then(res => {
                 console.log("Copy list response:", res.data);
@@ -348,7 +384,7 @@ function Board({ userId }) {
             .then(res => {
                 console.log("Update list color response:", res.data);
                 if (res.data.message === 'List color updated') {
-                    setListColors(prev => ({ ...prev, [listName]: color.hex }));
+                    setListColors(prev => ({ ...prev, [newListName]: color.hex }));
                     setShowColorPicker(null);
                 } else {
                     alert('Failed to update list color');
@@ -365,7 +401,7 @@ function Board({ userId }) {
             alert('Please enter a board name');
             return;
         }
-        axios.put(`http://localhost:5000/boards/${userId}`, { name: newBoardName.trim() })
+        axios.put(`http://localhost:5000/boards/${boardId}`, { name: newBoardName.trim() })
             .then(res => {
                 console.log("Rename board response:", res.data);
                 if (res.data.message === 'Board name updated') {
@@ -387,7 +423,6 @@ function Board({ userId }) {
         const addCardInputRef = React.useRef(null);
         const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-        // Sanitize the column name for use in CSS selectors
         const sanitizeColumnName = (name) => {
             return name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
         };
@@ -406,7 +441,6 @@ function Board({ userId }) {
             }
         }, [column]);
 
-        // Close dropdown when clicking outside
         React.useEffect(() => {
             const handleClickOutside = (event) => {
                 if (
@@ -702,9 +736,9 @@ function Board({ userId }) {
         );
     };
 
-    if (!userId) {
-        console.log("userId is not available in Board component");
-        return <div className="text-white">User ID is not available. Please log in again.</div>;
+    if (!userId || !boardId) {
+        console.log("userId or boardId is not available in Board component");
+        return <div className="text-white">User ID or Board ID is not available. Please select a board.</div>;
     }
 
     if (isLoadingBoard || isLoading) {

@@ -1,8 +1,10 @@
+// App.js
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
 import Login from "./Login";
 import Signup from "./Signup";
 import Board from "./Board";
+import BoardSelector from "./BoardSelector";
 
 function App() {
     const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -11,6 +13,7 @@ function App() {
     const [userId, setUserId] = useState(() => {
         return localStorage.getItem('userId') || null;
     });
+    const [selectedBoardId, setSelectedBoardId] = useState(null);
 
     useEffect(() => {
         localStorage.setItem('isLoggedIn', isLoggedIn);
@@ -20,6 +23,7 @@ function App() {
     const handleLogout = () => {
         setIsLoggedIn(false);
         setUserId(null);
+        setSelectedBoardId(null);
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('userId');
     };
@@ -38,7 +42,12 @@ function App() {
                                 </>
                             ) : (
                                 <>
-                                    <Link className="nav-link" to="/board">Board</Link>
+                                    <Link className="nav-link" to="/board-selector">Boards</Link>
+                                    {selectedBoardId && (
+                                        <Link className="nav-link" to={`/board/${selectedBoardId}`}>
+                                            Current Board
+                                        </Link>
+                                    )}
                                     <button
                                         className="nav-link btn btn-link"
                                         onClick={handleLogout}
@@ -58,27 +67,42 @@ function App() {
                     />
                     <Route path="/signup" element={<Signup />} />
                     <Route
-                        path="/board"
+                        path="/board-selector"
                         element={
                             isLoggedIn && userId ? (
-                                <>
-                                    {console.log("userId in App.js:", userId)}
-                                    <Board userId={userId} />
-                                </>
+                                <BoardSelector userId={userId} setSelectedBoardId={setSelectedBoardId} />
                             ) : (
                                 <Navigate to="/login" replace />
                             )
                         }
                     />
                     <Route
-                        path="/"
+                        path="/board/:boardId"
                         element={
-                            isLoggedIn ? (
-                                <Navigate to="/board" replace />
+                            isLoggedIn && userId ? (
+                                <Board userId={userId} boardId={selectedBoardId} />
                             ) : (
                                 <Navigate to="/login" replace />
                             )
                         }
+                    />
+                    <Route
+                        path="/board"
+                        element={<Navigate to="/board-selector" replace />}
+                    />
+                    <Route
+                        path="/"
+                        element={
+                            isLoggedIn ? (
+                                <Navigate to="/board-selector" replace />
+                            ) : (
+                                <Navigate to="/login" replace />
+                            )
+                        }
+                    />
+                    <Route
+                        path="*"
+                        element={<Navigate to="/board-selector" replace />}
                     />
                 </Routes>
             </div>
