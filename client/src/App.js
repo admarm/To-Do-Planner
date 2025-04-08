@@ -81,6 +81,14 @@ function App() {
                                         </button>
                                     </>
                                 )}
+                                <button
+                                    className="nav-link btn btn-link dark-mode-toggle"
+                                    onClick={() => setDarkMode(prev => !prev)}
+                                    title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                                    aria-label={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                                >
+                                    <i className={darkMode ? "bi bi-sun" : "bi bi-moon"}></i>
+                                </button>
                             </div>
                         </div>
                     </div>
