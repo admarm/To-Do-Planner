@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 import { SketchPicker } from 'react-color';
@@ -11,7 +11,6 @@ function Board({ userId }) {
     const dispatch = useDispatch();
     const { cards = [], isLoading, error } = useSelector((state) => state.cards);
 
-    const [newCardTitle, setNewCardTitle] = useState('');
     const [showInput, setShowInput] = useState({});
     const [lists, setLists] = useState([]);
     const [listColors, setListColors] = useState({});
@@ -19,9 +18,7 @@ function Board({ userId }) {
     const [newListName, setNewListName] = useState('');
     const [showListInput, setShowListInput] = useState(false);
     const [renamingList, setRenamingList] = useState(null);
-    const [renameValue, setRenameValue] = useState('');
     const [editingCard, setEditingCard] = useState(null);
-    const [editCardTitle, setEditCardTitle] = useState('');
     const [showColorPicker, setShowColorPicker] = useState(null);
     const [boardName, setBoardName] = useState('My Board');
     const [renamingBoard, setRenamingBoard] = useState(false);
@@ -56,41 +53,7 @@ function Board({ userId }) {
         }
     }, [userId, boardId, dispatch]);
 
-    const handleAddCard = (columnName) => {
-        if (newCardTitle.trim() === '') {
-            alert('Please enter a card title');
-            return;
-        }
-        if (!userId) {
-            alert('User ID is not available. Please log in again.');
-            return;
-        }
-        const newCardData = { userId, title: newCardTitle, color: 'orange', column_name: columnName };
-        axios.post('http://localhost:5000/cards', newCardData)
-            .then(res => {
-                const message = res.data.message ? res.data.message.trim() : '';
-                if (message === "Card Added") {
-                    const newCard = {
-                        id: res.data.cardId,
-                        title: newCardTitle,
-                        color: res.data.color || 'orange',
-                        column_name: columnName,
-                    };
-                    dispatch(addCard(newCard));
-                    setNewCardTitle('');
-                    setShowInput(prev => ({ ...prev, [columnName]: false }));
-                } else {
-                    alert('Failed to add card');
-                    dispatch(fetchCards({ userId, boardId }));
-                }
-            })
-            .catch(err => {
-                alert('Error adding card');
-                dispatch(fetchCards({ userId, boardId }));
-            });
-    };
-
-    const handleAddList = () => {
+    const handleAddList = useCallback(() => {
         if (newListName.trim() === '') {
             alert('Please enter a list name');
             return;
@@ -104,7 +67,7 @@ function Board({ userId }) {
             .then(res => {
                 if (res.data.message === 'List added') {
                     const newListNameTrimmed = newListName.trim();
-                    setLists([...lists, newListNameTrimmed]);
+                    setLists(l => [...l, newListNameTrimmed]);
                     setListColors(prev => ({ ...prev, [newListNameTrimmed]: '#2c3e50' }));
                     setListIds(prev => ({ ...prev, [newListNameTrimmed]: res.data.listId }));
                     setNewListName('');
@@ -116,9 +79,9 @@ function Board({ userId }) {
             .catch(err => {
                 alert(err.response?.data || 'Error adding list');
             });
-    };
+    }, [newListName, boardId, lists]);
 
-    const handleDeleteList = (listName) => {
+    const handleDeleteList = useCallback((listName) => {
         if (window.confirm(`Are you sure you want to delete the list "${listName}"? All cards in this list will be moved to "Tasks".`)) {
             const listId = listIds[listName];
             axios.delete(`http://localhost:5000/lists/${listId}`)
@@ -153,47 +116,47 @@ function Board({ userId }) {
                     alert('Error deleting list');
                 });
         }
-    };
+    }, [listIds, cards, userId, dispatch]);
 
-    const handleRenameList = (oldName) => {
-        if (renameValue.trim() === '') {
+    const handleRenameList = useCallback((oldName, newName) => {
+        if (newName.trim() === '') {
             alert('Please enter a new list name');
             return;
         }
-        if (lists.includes(renameValue.trim())) {
+        if (lists.includes(newName.trim())) {
             alert('List name already exists');
             return;
         }
         const listId = listIds[oldName];
-        axios.put(`http://localhost:5000/lists/${listId}`, { name: renameValue.trim() })
+        axios.put(`http://localhost:5000/lists/${listId}`, { name: newName.trim() })
             .then(res => {
                 if (res.data.message === 'List renamed') {
-                    const updatedLists = lists.map(list => (list === oldName ? renameValue.trim() : list));
+                    const updatedLists = lists.map(list => (list === oldName ? newName.trim() : list));
                     setLists(updatedLists);
-                    axios.put('http://localhost:5000/cards/rename-list', { userId, oldName, newName: renameValue.trim() })
+                    console.log('Sending payload to /cards/rename:', { userId, oldName: oldName, newName: newName.trim() });
+                    axios.put('http://localhost:5000/cards/rename', { userId, oldName: oldName, newName: newName.trim() })
                         .then(res => {
                             if (res.data === "Cards Renamed") {
                                 const updatedCards = cards.map(card => {
                                     if ((card.column_name || '').trim() === oldName) {
-                                        return { ...card, column_name: renameValue.trim() };
+                                        return { ...card, column_name: newName.trim() };
                                     }
                                     return card;
                                 });
                                 dispatch(setCards(updatedCards));
                                 setListColors(prev => {
                                     const newColors = { ...prev };
-                                    newColors[renameValue.trim()] = newColors[oldName];
+                                    newColors[newName.trim()] = newColors[oldName];
                                     delete newColors[oldName];
                                     return newColors;
                                 });
                                 setListIds(prev => {
                                     const newIds = { ...prev };
-                                    newIds[renameValue.trim()] = newIds[oldName];
+                                    newIds[newName.trim()] = newIds[oldName];
                                     delete newIds[oldName];
                                     return newIds;
                                 });
                                 setRenamingList(null);
-                                setRenameValue('');
                             } else {
                                 alert('Failed to update cards. Reverting list name change.');
                                 axios.put(`http://localhost:5000/lists/${listId}`, { name: oldName })
@@ -206,6 +169,7 @@ function Board({ userId }) {
                             }
                         })
                         .catch(err => {
+                            console.error('Error from /cards/rename:', err.response?.data);
                             alert(err.response?.data || 'Error renaming cards. Reverting list name change.');
                             axios.put(`http://localhost:5000/lists/${listId}`, { name: oldName })
                                 .then(() => {
@@ -222,19 +186,19 @@ function Board({ userId }) {
             .catch(err => {
                 alert(err.response?.data || 'Error renaming list');
             });
-    };
+    }, [lists, listIds, userId, cards, dispatch]);
 
-    const handleEditCard = (card) => {
-        if (editCardTitle.trim() === '') {
+    const handleEditCard = useCallback((card, newTitle) => {
+        console.log(`handleEditCard called with newTitle: "${newTitle}"`);
+        if (newTitle.trim() === '') {
             alert('Please enter a card title');
             return;
         }
-        axios.put(`http://localhost:5000/cards/${card.id}`, { title: editCardTitle.trim() })
+        axios.put(`http://localhost:5000/cards/${card.id}`, { title: newTitle.trim() })
             .then(res => {
                 if (res.data === "Card Updated") {
-                    dispatch(updateCard({ id: card.id, updates: { title: editCardTitle.trim() } }));
+                    dispatch(updateCard({ id: card.id, updates: { title: newTitle.trim() } }));
                     setEditingCard(null);
-                    setEditCardTitle('');
                 } else {
                     alert('Failed to update card');
                     dispatch(fetchCards({ userId, boardId }));
@@ -244,9 +208,9 @@ function Board({ userId }) {
                 alert(err.response?.data || 'Error updating card');
                 dispatch(fetchCards({ userId, boardId }));
             });
-    };
+    }, [userId, boardId, dispatch]);
 
-    const handleDeleteCard = (cardId) => {
+    const handleDeleteCard = useCallback((cardId) => {
         if (window.confirm('Are you sure you want to delete this card?')) {
             axios.delete(`http://localhost:5000/cards/${cardId}`)
                 .then(res => {
@@ -267,9 +231,9 @@ function Board({ userId }) {
                     }
                 });
         }
-    };
+    }, [userId, boardId, dispatch]);
 
-    const handleCopyList = (listName) => {
+    const handleCopyList = useCallback((listName) => {
         const newListName = `${listName} (Copy)`;
         if (lists.includes(newListName)) {
             alert('A list with this name already exists');
@@ -311,13 +275,13 @@ function Board({ userId }) {
             .catch(err => {
                 alert(err.response?.data || 'Error copying list');
             });
-    };
+    }, [lists, listColors, boardId, cards, userId, dispatch]);
 
-    const handleMoveList = (listName) => {
+    const handleMoveList = useCallback((listName) => {
         alert(`Move list "${listName}" functionality to be implemented.`);
-    };
+    }, []);
 
-    const handleMoveAllCards = (listName) => {
+    const handleMoveAllCards = useCallback((listName) => {
         const otherLists = lists.filter(list => list !== listName);
         if (otherLists.length === 0) {
             alert('There are no other lists to move cards to.');
@@ -338,16 +302,16 @@ function Board({ userId }) {
         axios.put('http://localhost:5000/cards/move', { userId, fromList: listName, toList: targetList })
             .then(res => {})
             .catch(err => console.error("Error moving cards:", err));
-    };
+    }, [lists, cards, userId, dispatch]);
 
-    const handleSortList = (listName) => {
+    const handleSortList = useCallback((listName) => {
         const listCards = cards.filter(card => (card.column_name || '').trim() === listName);
         const otherCards = cards.filter(card => (card.column_name || '').trim() !== listName);
         const sortedCards = listCards.sort((a, b) => a.title.localeCompare(b.title));
         dispatch(setCards([...otherCards, ...sortedCards]));
-    };
+    }, [cards, dispatch]);
 
-    const handleChangeListColor = (listName, color) => {
+    const handleChangeListColor = useCallback((listName, color) => {
         const listId = listIds[listName];
         axios.put(`http://localhost:5000/lists/${listId}/color`, { color: color.hex })
             .then(res => {
@@ -361,9 +325,9 @@ function Board({ userId }) {
             .catch(err => {
                 alert(err.response?.data || 'Error updating list color');
             });
-    };
+    }, [listIds]);
 
-    const handleRenameBoard = () => {
+    const handleRenameBoard = useCallback(() => {
         if (newBoardName.trim() === '') {
             alert('Please enter a board name');
             return;
@@ -381,12 +345,14 @@ function Board({ userId }) {
             .catch(err => {
                 alert(err.response?.data || 'Error renaming board');
             });
-    };
+    }, [newBoardName, boardId]);
 
-    const SimpleList = ({ column }) => {
+    const SimpleList = React.memo(({ column }) => {
         const inputRef = React.useRef(null);
         const addCardInputRef = React.useRef(null);
         const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+        const [newCardTitle, setNewCardTitle] = useState('');
+        const [renameValue, setRenameValue] = useState(column);
 
         const sanitizeColumnName = (name) => {
             return name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '');
@@ -394,17 +360,20 @@ function Board({ userId }) {
 
         const sanitizedColumn = sanitizeColumnName(column);
 
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         React.useEffect(() => {
             if (renamingList === column && inputRef.current) {
                 inputRef.current.focus();
+                setRenameValue(column);
             }
-        }, [column]);
+        }, [renamingList, column]);
 
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         React.useEffect(() => {
             if (showInput[column] && addCardInputRef.current) {
                 addCardInputRef.current.focus();
             }
-        }, [column]);
+        }, [showInput, column]);
 
         React.useEffect(() => {
             const handleClickOutside = (event) => {
@@ -421,6 +390,40 @@ function Board({ userId }) {
                 document.removeEventListener('mousedown', handleClickOutside);
             };
         }, [isDropdownOpen, sanitizedColumn]);
+
+        const handleAddCard = useCallback(() => {
+            if (newCardTitle.trim() === '') {
+                alert('Please enter a card title');
+                return;
+            }
+            if (!userId) {
+                alert('User ID is not available. Please log in again.');
+                return;
+            }
+            const newCardData = { userId, title: newCardTitle, color: 'orange', column_name: column };
+            axios.post('http://localhost:5000/cards', newCardData)
+                .then(res => {
+                    const message = res.data.message ? res.data.message.trim() : '';
+                    if (message === "Card Added") {
+                        const newCard = {
+                            id: res.data.cardId,
+                            title: newCardTitle,
+                            color: res.data.color || 'orange',
+                            column_name: column,
+                        };
+                        dispatch(addCard(newCard));
+                        setNewCardTitle('');
+                        setShowInput(prev => ({ ...prev, [column]: false }));
+                    } else {
+                        alert('Failed to add card');
+                        dispatch(fetchCards({ userId, boardId }));
+                    }
+                })
+                .catch(err => {
+                    alert('Error adding card');
+                    dispatch(fetchCards({ userId, boardId }));
+                });
+        }, [newCardTitle, column]);
 
         const filteredCards = (cards || []).filter(card => (card.column_name || '').trim() === column);
 
@@ -567,9 +570,16 @@ function Board({ userId }) {
                                     value={renameValue}
                                     onChange={(e) => setRenameValue(e.target.value)}
                                     onClick={(e) => e.stopPropagation()}
-                                    onKeyDown={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                        if (e.key === 'Enter') {
+                                            handleRenameList(column, renameValue);
+                                        } else if (e.key === 'Escape') {
+                                            setRenamingList(null);
+                                        }
+                                    }}
                                 />
-                                <button className="btn btn-success btn-sm" onClick={() => handleRenameList(column)}>
+                                <button className="btn btn-success btn-sm" onClick={() => handleRenameList(column, renameValue)}>
                                     Save
                                 </button>
                                 <button className="btn btn-secondary btn-sm" onClick={() => setRenamingList(null)}>
@@ -603,10 +613,17 @@ function Board({ userId }) {
                                             value={newCardTitle}
                                             onChange={(e) => setNewCardTitle(e.target.value)}
                                             onClick={(e) => e.stopPropagation()}
-                                            onKeyDown={(e) => e.stopPropagation()}
+                                            onKeyDown={(e) => {
+                                                e.stopPropagation();
+                                                if (e.key === 'Enter') {
+                                                    handleAddCard();
+                                                } else if (e.key === 'Escape') {
+                                                    setShowInput({ ...showInput, [column]: false });
+                                                }
+                                            }}
                                         />
                                         <div className="d-flex gap-2">
-                                            <button className="btn btn-success btn-sm" onClick={() => handleAddCard(column)}>
+                                            <button className="btn btn-success btn-sm" onClick={handleAddCard}>
                                                 Add
                                             </button>
                                             <button className="btn btn-secondary btn-sm" onClick={() => setShowInput({ ...showInput, [column]: false })}>
@@ -621,16 +638,19 @@ function Board({ userId }) {
                 </div>
             </div>
         );
-    };
+    });
 
-    const SimpleCard = ({ card }) => {
+    const SimpleCard = React.memo(({ card }) => {
         const inputRef = React.useRef(null);
+        const [localEditCardTitle, setLocalEditCardTitle] = useState(card.title);
 
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         React.useEffect(() => {
             if (editingCard === card.id && inputRef.current) {
                 inputRef.current.focus();
+                setLocalEditCardTitle(card.title);
             }
-        }, [card.id]);
+        }, [editingCard, card.id, card.title]);
 
         return (
             <div className="simple-card card mb-2">
@@ -641,12 +661,23 @@ function Board({ userId }) {
                                 ref={inputRef}
                                 type="text"
                                 className="form-control"
-                                value={editCardTitle}
-                                onChange={(e) => setEditCardTitle(e.target.value)}
+                                value={localEditCardTitle}
+                                onChange={(e) => setLocalEditCardTitle(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Enter' && localEditCardTitle.trim() !== '') {
+                                        handleEditCard(card, localEditCardTitle);
+                                    } else if (e.key === 'Escape') {
+                                        setEditingCard(null);
+                                    }
+                                }}
                             />
-                            <button className="btn btn-success btn-sm" onClick={() => handleEditCard(card)}>
+                            <button
+                                className="btn btn-success btn-sm"
+                                onClick={() => handleEditCard(card, localEditCardTitle)}
+                                disabled={localEditCardTitle.trim() === ''}
+                            >
                                 Save
                             </button>
                             <button className="btn btn-secondary btn-sm" onClick={() => setEditingCard(null)}>
@@ -662,7 +693,6 @@ function Board({ userId }) {
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setEditingCard(card.id);
-                                        setEditCardTitle(card.title);
                                     }}
                                 >
                                     Edit
@@ -676,7 +706,7 @@ function Board({ userId }) {
                 </div>
             </div>
         );
-    };
+    });
 
     if (!userId || !boardId) {
         return <div className="text-center text-secondary mt-5">User ID or Board ID is not available. Please select a board.</div>;
