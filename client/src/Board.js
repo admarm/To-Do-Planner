@@ -24,6 +24,24 @@ function Board({ userId }) {
     const [renamingBoard, setRenamingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
     const [isLoadingBoard, setIsLoadingBoard] = useState(true);
+    const [darkMode, setDarkMode] = useState(() => {
+        const savedMode = localStorage.getItem('darkMode');
+        return savedMode ? JSON.parse(savedMode) : false;
+    });
+
+    // Apply dark-mode class to the document root and save to localStorage
+    useEffect(() => {
+        if (darkMode) {
+            document.documentElement.classList.add('dark-mode');
+        } else {
+            document.documentElement.classList.remove('dark-mode');
+        }
+        localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    }, [darkMode]);
+
+    const toggleDarkMode = () => {
+        setDarkMode(prevMode => !prevMode);
+    };
 
     useEffect(() => {
         if (userId && boardId) {
@@ -463,7 +481,6 @@ function Board({ userId }) {
                                         width: '200px',
                                         minWidth: '200px',
                                         maxWidth: '200px',
-                                        backgroundColor: 'white',
                                         padding: '5px 0',
                                     }}
                                 >
@@ -772,6 +789,15 @@ function Board({ userId }) {
                             </div>
                         )}
                     </div>
+                </div>
+                <div className="d-flex justify-content-end mb-3">
+                    <button
+                        className="btn btn-outline-secondary dark-mode-toggle"
+                        onClick={toggleDarkMode}
+                        title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                    >
+                        <i className={darkMode ? "bi bi-sun" : "bi bi-moon"}></i>
+                    </button>
                 </div>
                 <div className="d-flex gap-3" style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
                     {lists.map((column) => (
