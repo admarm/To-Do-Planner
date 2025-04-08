@@ -13,14 +13,17 @@
   --card-header-text: #FFFFFF;
   --dropdown-bg: #FFFFFF;
   --dropdown-text: #2D3436;
+  --dropdown-hover-bg: #F1F4F8;
   --simple-card-bg: #F8F9FA;
   --simple-card-hover-bg: #EDEFF2;
   --input-border: #DDEEFF;
   --input-focus-shadow: rgba(74, 144, 226, 0.25);
+  --alert-danger-bg: #F8D7DA;
+  --alert-danger-text: #721C24;
 }
 
 /* Dark Mode */
-.dark-mode {
+html.dark-mode {
   --primary: #66B0FF;
   --secondary: #212529;
   --text-primary: #E9ECEF;
@@ -33,10 +36,13 @@
   --card-header-text: #E9ECEF;
   --dropdown-bg: #343A40;
   --dropdown-text: #E9ECEF;
+  --dropdown-hover-bg: #495057;
   --simple-card-bg: #495057;
   --simple-card-hover-bg: #5A6268;
   --input-border: #6C757D;
   --input-focus-shadow: rgba(102, 176, 255, 0.25);
+  --alert-danger-bg: #721C24;
+  --alert-danger-text: #F8D7DA;
 }
 
 body {
@@ -188,6 +194,13 @@ body {
 .list-card:nth-child(5n+4) .card-header { background: linear-gradient(135deg, #FFEAA7 0%, #FFF1C1 100%); }
 .list-card:nth-child(5n+5) .card-header { background: linear-gradient(135deg, #FAB1A0 0%, #FCC1B3 100%); }
 
+/* Dark Mode List Colors */
+html.dark-mode .list-card:nth-child(5n+1) .card-header { background: linear-gradient(135deg, #5A93CC 0%, #7D9FCC 100%); }
+html.dark-mode .list-card:nth-child(5n+2) .card-header { background: linear-gradient(135deg, #7D78CC 0%, #9A93CC 100%); }
+html.dark-mode .list-card:nth-child(5n+3) .card-header { background: linear-gradient(135deg, #44B89A 0%, #66C6A6 100%); }
+html.dark-mode .list-card:nth-child(5n+4) .card-header { background: linear-gradient(135deg, #CCB983 0%, #CCBF99 100%); }
+html.dark-mode .list-card:nth-child(5n+5) .card-header { background: linear-gradient(135deg, #C78E80 0%, #C99A8F 100%); }
+
 /* Individual Cards */
 .simple-card {
   background-color: var(--simple-card-bg);
@@ -215,6 +228,32 @@ body {
   box-shadow: 0 0 0 0.2rem var(--input-focus-shadow);
 }
 
+/* Ensure placeholder text is visible in both modes */
+.form-control::placeholder {
+  color: var(--text-secondary);
+  opacity: 1; /* Ensure placeholder is fully visible */
+}
+
+/* Form Labels */
+.form-label {
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+
+/* Headings in Login/Signup Cards */
+.card h2 {
+  color: var(--text-primary);
+  transition: color 0.3s;
+}
+
+/* Alerts (Error Messages) */
+.alert.alert-danger {
+  background-color: var(--alert-danger-bg);
+  color: var(--alert-danger-text);
+  border-color: var(--danger);
+  transition: background-color 0.3s, color 0.3s;
+}
+
 /* Text Colors */
 .text-secondary {
   color: var(--text-secondary) !important;
@@ -240,11 +279,7 @@ body {
 }
 
 .dropdown-item:hover {
-  background-color: #F1F4F8;
-}
-
-.dark-mode .dropdown-item:hover {
-  background-color: #495057;
+  background-color: var(--dropdown-hover-bg);
 }
 
 /* Animations */

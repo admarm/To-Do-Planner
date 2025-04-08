@@ -790,15 +790,6 @@ function Board({ userId }) {
                         )}
                     </div>
                 </div>
-                <div className="d-flex justify-content-end mb-3">
-                    <button
-                        className="btn btn-outline-secondary dark-mode-toggle"
-                        onClick={toggleDarkMode}
-                        title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                    >
-                        <i className={darkMode ? "bi bi-sun" : "bi bi-moon"}></i>
-                    </button>
-                </div>
                 <div className="d-flex gap-3" style={{ overflowX: 'auto', paddingBottom: '1rem' }}>
                     {lists.map((column) => (
                         <SimpleList key={column} column={column} />

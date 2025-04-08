@@ -14,11 +14,24 @@ function App() {
         return localStorage.getItem('userId') || null;
     });
     const [selectedBoardId, setSelectedBoardId] = useState(null);
+    const [darkMode, setDarkMode] = useState(() => {
+        const savedMode = localStorage.getItem('darkMode');
+        return savedMode ? JSON.parse(savedMode) : false;
+    });
 
     useEffect(() => {
         localStorage.setItem('isLoggedIn', isLoggedIn);
         localStorage.setItem('userId', userId);
     }, [isLoggedIn, userId]);
+
+    useEffect(() => {
+        if (darkMode) {
+            document.documentElement.classList.add('dark-mode');
+        } else {
+            document.documentElement.classList.remove('dark-mode');
+        }
+        localStorage.setItem('darkMode', JSON.stringify(darkMode));
+    }, [darkMode]);
 
     const handleLogout = () => {
         setIsLoggedIn(false);
