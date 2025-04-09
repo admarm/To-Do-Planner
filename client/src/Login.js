@@ -8,8 +8,44 @@ function Login({ setIsLoggedIn, setUserId }) {
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
+    // List of valid email domains
+    const validDomains = [
+        'gmail.com',
+        'yahoo.com',
+        'abv.bg',
+        'mail.bg',
+        'outlook.com',
+        'hotmail.com',
+        'icloud.com',
+        'aol.com',
+        'protonmail.com',
+        'zoho.com',
+        'msn.com',
+        'live.com',
+        'edu.bg', 
+        'org.bg'    
+      ];
+
+    // Function to validate email domain
+    const validateEmailDomain = (email) => {
+        const domain = email.split('@')[1]?.toLowerCase();
+        if (!domain) {
+            return false; // No domain part (e.g., missing '@')
+        }
+        return validDomains.includes(domain);
+    };
+
     const handleLogin = (e) => {
         e.preventDefault();
+        setError(''); // Clear previous errors
+
+        // Validate email domain
+        if (!validateEmailDomain(email)) {
+            setError('Please use a valid email domain (e.g., gmail.com, yahoo.com, abv.bg, mail.bg)');
+            return;
+        }
+
+        // Proceed with login if validation passes
         axios.post('http://localhost:5000/login', { email, password })
             .then(res => {
                 if (res.data.message === "Login Successful") {
