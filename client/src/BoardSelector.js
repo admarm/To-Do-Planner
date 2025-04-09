@@ -12,17 +12,15 @@ function BoardSelector({ userId, setSelectedBoardId }) {
             axios.get(`http://localhost:5000/boards/user/${userId}`)
                 .then(res => {
                     setBoards(res.data);
-                    if (res.data.length > 0) {
-                        setSelectedBoardId(res.data[0].id);
-                        navigate(`/board/${res.data[0].id}`);
-                    }
+                    // Remove automatic navigation to the first board
+                    // Only set the boards and let the user select one manually
                 })
                 .catch(err => {
                     console.error("Error fetching boards:", err);
                     alert('Error fetching boards. Please try refreshing the page.');
                 });
         }
-    }, [userId, setSelectedBoardId, navigate]);
+    }, [userId]);
 
     const handleAddBoard = () => {
         if (newBoardName.trim() === '') {
@@ -35,6 +33,7 @@ function BoardSelector({ userId, setSelectedBoardId }) {
                     const newBoard = { id: res.data.boardId, name: newBoardName };
                     setBoards([...boards, newBoard]);
                     setNewBoardName('');
+                    // Optionally navigate to the new board after creation
                     setSelectedBoardId(newBoard.id);
                     navigate(`/board/${newBoard.id}`);
                 } else {
@@ -53,13 +52,8 @@ function BoardSelector({ userId, setSelectedBoardId }) {
                     if (res.data.message === 'Board deleted') {
                         const remainingBoards = boards.filter(board => board.id !== boardId);
                         setBoards(remainingBoards);
-                        if (remainingBoards.length > 0) {
-                            setSelectedBoardId(remainingBoards[0].id);
-                            navigate(`/board/${remainingBoards[0].id}`);
-                        } else {
-                            setSelectedBoardId(null);
-                            navigate('/board-selector');
-                        }
+                        // If the deleted board was the selected one, clear the selection
+                        setSelectedBoardId(null);
                     } else {
                         alert('Failed to delete board');
                     }
@@ -68,6 +62,11 @@ function BoardSelector({ userId, setSelectedBoardId }) {
                     alert('Error deleting board');
                 });
         }
+    };
+
+    const handleSelectBoard = (boardId) => {
+        setSelectedBoardId(boardId);
+        navigate(`/board/${boardId}`);
     };
 
     return (
@@ -103,7 +102,10 @@ function BoardSelector({ userId, setSelectedBoardId }) {
                                         to={`/board/${board.id}`}
                                         className="text-primary"
                                         style={{ textDecoration: 'none', fontWeight: 600 }}
-                                        onClick={() => setSelectedBoardId(board.id)}
+                                        onClick={(e) => {
+                                            e.preventDefault(); // Prevent default Link behavior
+                                            handleSelectBoard(board.id);
+                                        }}
                                     >
                                         <h5 className="mb-0">{board.name}</h5>
                                     </Link>

@@ -24,24 +24,6 @@ function Board({ userId }) {
     const [renamingBoard, setRenamingBoard] = useState(false);
     const [newBoardName, setNewBoardName] = useState('');
     const [isLoadingBoard, setIsLoadingBoard] = useState(true);
-    const [darkMode, setDarkMode] = useState(() => {
-        const savedMode = localStorage.getItem('darkMode');
-        return savedMode ? JSON.parse(savedMode) : false;
-    });
-
-    // Apply dark-mode class to the document root and save to localStorage
-    useEffect(() => {
-        if (darkMode) {
-            document.documentElement.classList.add('dark-mode');
-        } else {
-            document.documentElement.classList.remove('dark-mode');
-        }
-        localStorage.setItem('darkMode', JSON.stringify(darkMode));
-    }, [darkMode]);
-
-    const toggleDarkMode = () => {
-        setDarkMode(prevMode => !prevMode);
-    };
 
     useEffect(() => {
         if (userId && boardId) {
@@ -378,7 +360,6 @@ function Board({ userId }) {
 
         const sanitizedColumn = sanitizeColumnName(column);
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         React.useEffect(() => {
             if (renamingList === column && inputRef.current) {
                 inputRef.current.focus();
@@ -386,7 +367,6 @@ function Board({ userId }) {
             }
         }, [renamingList, column]);
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         React.useEffect(() => {
             if (showInput[column] && addCardInputRef.current) {
                 addCardInputRef.current.focus();
@@ -661,7 +641,6 @@ function Board({ userId }) {
         const inputRef = React.useRef(null);
         const [localEditCardTitle, setLocalEditCardTitle] = useState(card.title);
 
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         React.useEffect(() => {
             if (editingCard === card.id && inputRef.current) {
                 inputRef.current.focus();
