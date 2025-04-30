@@ -141,5 +141,5 @@ To-Do Planner е уеб приложение за управление на за
 - **Калоян Павлов** – База данни, Тестинг
 
 - # Да живее GROK
-![Maimunqk](https://github.com/user-attachments/assets/f000ea63-afc4-413c-bb50-0a8e786b23f9)
+![Maimunqk](https://github.com/user-attachments/assets/c01ce8cc-0e11-4aef-8868-a673cfbaf54d)
 
