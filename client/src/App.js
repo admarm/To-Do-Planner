@@ -11,13 +11,10 @@ function App() {
     const [userId, setUserId] = useState(() => {
         return localStorage.getItem('userId') || null;
     });
-<<<<<<< Updated upstream
-=======
     const [selectedBoardId, setSelectedBoardId] = useState(null);
     const [isDarkTheme, setIsDarkTheme] = useState(() => {
         return localStorage.getItem('theme') === 'dark';
     });
->>>>>>> Stashed changes
 
     useEffect(() => {
         localStorage.setItem('isLoggedIn', isLoggedIn);
@@ -47,25 +44,6 @@ function App() {
                 <nav className="navbar navbar-expand-lg navbar-light bg-light">
                     <div className="container-fluid">
                         <Link className="navbar-brand" to="/">To-Do App</Link>
-<<<<<<< Updated upstream
-                        <div className="navbar-nav">
-                            {!isLoggedIn ? (
-                                <>
-                                    <Link className="nav-link" to="/login">Login</Link>
-                                    <Link className="nav-link" to="/signup">Sign Up</Link>
-                                </>
-                            ) : (
-                                <>
-                                    <Link className="nav-link" to="/board">Board</Link>
-                                    <button
-                                        className="nav-link btn btn-link"
-                                        onClick={handleLogout}
-                                    >
-                                        Logout
-                                    </button>
-                                </>
-                            )}
-=======
                         <button
                             className="navbar-toggler"
                             type="button"
@@ -108,7 +86,6 @@ function App() {
                                     </>
                                 )}
                             </div>
->>>>>>> Stashed changes
                         </div>
                     </div>
                 </nav>
