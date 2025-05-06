@@ -458,9 +458,9 @@ function Board({ userId }) {
                                         top: '100%',
                                         right: 0,
                                         zIndex: 1000,
-                                        width: '200px',
-                                        minWidth: '200px',
-                                        maxWidth: '200px',
+                                        width: '220px',
+                                        minWidth: '220px',
+                                        maxWidth: '220px',
                                         padding: '5px 0',
                                     }}
                                 >
@@ -554,7 +554,7 @@ function Board({ userId }) {
                     <div
                         className="card-body"
                         style={{
-                            maxHeight: '400px',
+                            maxHeight: '600px',
                             overflowY: 'auto',
                         }}
                     >
