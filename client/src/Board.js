@@ -512,7 +512,7 @@ function Board({ userId }) {
                                     <div
                                         className="dropdown-item"
                                         onClick={() => {
-                                            setShowColorPicker(show => (show => show === column ? null : column));
+                                            setShowColorPicker(show => (show === column ? null : column));
                                             setIsDropdownOpen(false);
                                         }}
                                     >
@@ -649,7 +649,7 @@ function Board({ userId }) {
         }, [editingCard, card.id, card.title]);
 
         return (
-            <div className="simple-card card mb-2">
+            <div className="simple-card card mb-2" style={{ minWidth: '200px', maxWidth: '100%', wordWrap: 'break-word' }}>
                 <div className="card-body p-2 d-flex justify-content-between align-items-center">
                     {editingCard === card.id ? (
                         <div className="d-flex gap-2 w-100">
@@ -682,7 +682,9 @@ function Board({ userId }) {
                         </div>
                     ) : (
                         <>
-                            <p className="card-text mb-0">{card.title}</p>
+                            <p className="card-text mb-0" style={{ wordWrap: 'break-word', maxWidth: '100%' }}>
+                                {card.title}
+                            </p>
                             <div className="d-flex gap-1">
                                 <button
                                     className="btn btn-sm btn-outline-primary"
