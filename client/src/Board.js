@@ -649,59 +649,61 @@ function Board({ userId }) {
         }, [editingCard, card.id, card.title]);
 
         return (
-            <div className="simple-card card mb-2" style={{ minWidth: '200px', maxWidth: '100%', wordWrap: 'break-word' }}>
-                <div className="card-body p-2 d-flex justify-content-between align-items-center">
-                    {editingCard === card.id ? (
-                        <div className="d-flex gap-2 w-100">
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                className="form-control"
-                                value={localEditCardTitle}
-                                onChange={(e) => setLocalEditCardTitle(e.target.value)}
-                                onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => {
-                                    e.stopPropagation();
-                                    if (e.key === 'Enter' && localEditCardTitle.trim() !== '') {
-                                        handleEditCard(card, localEditCardTitle);
-                                    } else if (e.key === 'Escape') {
-                                        setEditingCard(null);
-                                    }
-                                }}
-                            />
-                            <button
-                                className="btn btn-success btn-sm"
-                                onClick={() => handleEditCard(card, localEditCardTitle)}
-                                disabled={localEditCardTitle.trim() === ''}
-                            >
-                                Save
-                            </button>
-                            <button className="btn btn-secondary btn-sm" onClick={() => setEditingCard(null)}>
-                                Cancel
-                            </button>
-                        </div>
-                    ) : (
-                        <>
+            <div className="mb-2">
+                <div className="simple-card card" style={{ minWidth: '200px', maxWidth: '100%', wordWrap: 'break-word' }}>
+                    <div className="card-body p-2">
+                        {editingCard === card.id ? (
+                            <div className="d-flex gap-2 w-100">
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    className="form-control"
+                                    value={localEditCardTitle}
+                                    onChange={(e) => setLocalEditCardTitle(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                        if (e.key === 'Enter' && localEditCardTitle.trim() !== '') {
+                                            handleEditCard(card, localEditCardTitle);
+                                        } else if (e.key === 'Escape') {
+                                            setEditingCard(null);
+                                        }
+                                    }}
+                                />
+                                <button
+                                    className="btn btn-success btn-sm"
+                                    onClick={() => handleEditCard(card, localEditCardTitle)}
+                                    disabled={localEditCardTitle.trim() === ''}
+                                >
+                                    Save
+                                </button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => setEditingCard(null)}>
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
                             <p className="card-text mb-0" style={{ wordWrap: 'break-word', maxWidth: '100%' }}>
                                 {card.title}
                             </p>
-                            <div className="d-flex gap-1">
-                                <button
-                                    className="btn btn-sm btn-outline-primary"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingCard(card.id);
-                                    }}
-                                >
-                                    Edit
-                                </button>
-                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteCard(card.id)}>
-                                    Delete
-                                </button>
-                            </div>
-                        </>
-                    )}
+                        )}
+                    </div>
                 </div>
+                {editingCard !== card.id && (
+                    <div className="d-flex gap-1 mt-1">
+                        <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCard(card.id);
+                            }}
+                        >
+                            Edit
+                        </button>
+                        <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteCard(card.id)}>
+                            Delete
+                        </button>
+                    </div>
+                )}
             </div>
         );
     });
